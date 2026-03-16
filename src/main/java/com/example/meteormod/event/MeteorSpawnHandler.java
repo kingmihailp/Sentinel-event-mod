@@ -1,6 +1,7 @@
 package com.example.meteormod.event;
 
 import com.example.meteormod.MeteorMod;
+import com.example.meteormod.MeteorConfig;
 import com.example.meteormod.entity.MeteorEntity;
 import com.example.meteormod.entity.ModEntities;
 import net.minecraft.server.level.ServerLevel;
@@ -17,9 +18,9 @@ import java.util.Map;
 @EventBusSubscriber(modid = MeteorMod.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
 public class MeteorSpawnHandler {
 
-    // 5–8 minutes in ticks (20 ticks/sec × 60 sec/min)
-    private static final int MIN_DELAY_TICKS = 5 * 60 * 20;  // 6 000
-    private static final int MAX_DELAY_TICKS = 8 * 60 * 20;  // 9 600
+    // Spawn radius: meteors land 8–10 blocks from the targeted player
+    private static final double MIN_RADIUS = 8.0;
+    private static final double MAX_RADIUS = 10.0;
 
     /** Per-dimension countdown — meteors only fire in the Overworld. */
     private static final Map<String, Integer> tickCounters = new HashMap<>();
@@ -35,19 +36,29 @@ public class MeteorSpawnHandler {
         List<ServerPlayer> players = serverLevel.players();
         if (players.isEmpty()) return;
 
+        int customDelay = MeteorConfig.getDelayTicks();
+
+        // -1 means continuous: spawn every tick (well, every shower-interval tick = 1)
+        if (customDelay == -1) {
+            spawnMeteorShower(serverLevel, players);
+            return;
+        }
+
         String key = serverLevel.dimension().location().toString();
-        int remaining = tickCounters.getOrDefault(key, MIN_DELAY_TICKS);
+        int remaining = tickCounters.getOrDefault(key, customDelay);
         remaining--;
 
         if (remaining <= 0) {
             spawnMeteorShower(serverLevel, players);
-            // Randomize next wave delay: 5–8 minutes
-            int delay = MIN_DELAY_TICKS
-                    + serverLevel.random.nextInt(MAX_DELAY_TICKS - MIN_DELAY_TICKS + 1);
-            tickCounters.put(key, delay);
+            tickCounters.put(key, customDelay);
         } else {
             tickCounters.put(key, remaining);
         }
+    }
+
+    /** Called externally (e.g. from the command) to reset all running countdowns. */
+    public static void resetCounters() {
+        tickCounters.clear();
     }
 
     private static void spawnMeteorShower(ServerLevel level, List<ServerPlayer> players) {
@@ -58,20 +69,20 @@ public class MeteorSpawnHandler {
             // Pick a random player to target
             ServerPlayer target = players.get(level.random.nextInt(players.size()));
 
-            // Random horizontal offset from the target (up to ±30 blocks)
-            double offsetX = (level.random.nextDouble() - 0.5) * 60.0;
-            double offsetZ = (level.random.nextDouble() - 0.5) * 60.0;
+            // Uniform random point inside an annulus [MIN_RADIUS, MAX_RADIUS]
+            double angle = level.random.nextDouble() * 2.0 * Math.PI;
+            double radius = MIN_RADIUS + level.random.nextDouble() * (MAX_RADIUS - MIN_RADIUS);
+            double offsetX = Math.cos(angle) * radius;
+            double offsetZ = Math.sin(angle) * radius;
 
             double spawnX = target.getX() + offsetX;
             double spawnZ = target.getZ() + offsetZ;
 
-            // Spawn just below the build height so the meteor is visible from far away
+            // Spawn just below the build height so the trail is visible
             double spawnY = level.getMaxBuildHeight() - 5.0;
 
             MeteorEntity meteor = new MeteorEntity(ModEntities.METEOR.get(), level);
             meteor.setPos(spawnX, spawnY, spawnZ);
-
-            // Give an initial downward velocity so they start moving immediately
             meteor.setDeltaMovement(0.0, -1.0, 0.0);
 
             level.addFreshEntity(meteor);
