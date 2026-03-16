@@ -54,30 +54,43 @@ public class MeteorEntity extends Entity {
         // Move the entity
         this.move(MoverType.SELF, this.getDeltaMovement());
 
-        // Spawn trail particles every tick on server side
+        // Spawn trail particles every tick on server side.
+        // Offset the origin opposite to the velocity so the tail streams behind the meteor.
         if (this.level() instanceof ServerLevel serverLevel) {
             Vec3 pos = this.position();
+            Vec3 vel = this.getDeltaMovement();
+            double len = vel.length();
 
-            // Fire particles — main trail
+            // Unit vector pointing backwards along the trajectory
+            double bx = (len > 0) ? -vel.x / len : 0;
+            double by = (len > 0) ? -vel.y / len : 1; // upward when no movement
+            double bz = (len > 0) ? -vel.z / len : 0;
+
+            // Trail origin: half a block behind the meteor's centre
+            double tx = pos.x + bx * 0.5;
+            double ty = pos.y + by * 0.5 + 0.5;
+            double tz = pos.z + bz * 0.5;
+
+            // Fire particles — tight at the base of the trail
             serverLevel.sendParticles(
                     ParticleTypes.FLAME,
-                    pos.x, pos.y + 0.5, pos.z,
-                    6, 0.25, 0.25, 0.25, 0.04
+                    tx, ty, tz,
+                    6, 0.15, 0.15, 0.15, 0.03
             );
 
-            // Large smoke — upper trail behind the meteor
+            // Large smoke — a bit further back, wider spread
             serverLevel.sendParticles(
                     ParticleTypes.LARGE_SMOKE,
-                    pos.x, pos.y + 1.0, pos.z,
-                    4, 0.3, 0.3, 0.3, 0.01
+                    tx + bx * 0.5, ty + by * 0.5, tz + bz * 0.5,
+                    4, 0.25, 0.25, 0.25, 0.01
             );
 
-            // Small smoke — lingering cloud
+            // Lingering cosy smoke — furthest back, every 3 ticks
             if (this.tickCount % 3 == 0) {
                 serverLevel.sendParticles(
                         ParticleTypes.CAMPFIRE_COSY_SMOKE,
-                        pos.x, pos.y + 1.5, pos.z,
-                        2, 0.4, 0.4, 0.4, 0.005
+                        tx + bx * 1.0, ty + by * 1.0, tz + bz * 1.0,
+                        2, 0.35, 0.35, 0.35, 0.004
                 );
             }
         }
