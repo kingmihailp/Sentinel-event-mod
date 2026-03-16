@@ -20,4 +20,14 @@ public class ModEntities {
                             .updateInterval(1)
                             .build("meteormod:meteor")
             );
+
+    // ── Custom mob with GeckoLib model ──────────────────────────────────────
+    // Adjust .sized() to match your model's dimensions.
+    public static final DeferredHolder<EntityType<?>, EntityType<SentinelEntity>> SENTINEL =
+            ENTITIES.register("sentinel", () ->
+                    EntityType.Builder.<SentinelEntity>of(SentinelEntity::new, MobCategory.MONSTER)
+                            .sized(0.6f, 1.8f)
+                            .clientTrackingRange(64)
+                            .build("meteormod:sentinel")
+            );
 }

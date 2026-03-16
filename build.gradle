@@ -42,10 +42,15 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
     mavenCentral()
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+    }
 }
 
 dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
+    implementation "software.bernie.geckolib:geckolib-neoforge-1.21.1:${geckolib_version}"
 }
 
 tasks.withType(ProcessResources).configureEach {
