@@ -24,7 +24,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.core.particles.ParticleTypes;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.*;
@@ -114,24 +113,15 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         if (level().isClientSide()) return;
         ServerLevel serverLevel = (ServerLevel) level();
 
-        // Nozzle fire trail every 2 ticks
-        if (tickCount % 2 == 0) {
-            spawnNozzleParticles(serverLevel);
-        }
-
         // ── Scanning state machine ────────────────────────────────────────────
         if (scanTimer > 0) {
             entityData.set(SCANNING, true);
             scanTimer--;
 
             if (scanBlockPos != null) {
-                // Block scan: look at block, emit particles, optionally break at end
+                // Block scan: look at block, optionally break at end
                 Vec3 target = Vec3.atCenterOf(scanBlockPos);
                 getLookControl().setLookAt(target.x, target.y, target.z, 30f, 30f);
-
-                if (scanTimer % 5 == 0) {
-                    spawnScanParticles(serverLevel, target);
-                }
 
                 if (scanTimer == 0) {
                     BlockState state = serverLevel.getBlockState(scanBlockPos);
@@ -146,15 +136,12 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
                 }
 
             } else if (scanEntityTarget != null) {
-                // Entity scan: look at entity, emit particles
+                // Entity scan: look at entity
                 if (!scanEntityTarget.isAlive()) {
                     scanEntityTarget = null;
                     scanTimer = 0;
                 } else {
                     getLookControl().setLookAt(scanEntityTarget, 30f, 30f);
-                    if (scanTimer % 5 == 0) {
-                        spawnScanParticles(serverLevel, scanEntityTarget.getEyePosition());
-                    }
                 }
             } else {
                 scanTimer = 0;
@@ -208,43 +195,9 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         scanCooldown = 40;
     }
 
-    // ── Blue wave from the eye (front face of model, negative Z) ─────────────
-    private void spawnScanParticles(ServerLevel serverLevel, Vec3 target) {
-        // Eye: ~0.3 blocks in front of entity center, slightly below eye height
-        float  yaw  = (float) Math.toRadians(getYRot());
-        double fwdX = -Math.sin(yaw);
-        double fwdZ =  Math.cos(yaw);
-
-        double eyeX = getX() + fwdX * 0.3;
-        double eyeY = getEyeY() - 0.15;
-        double eyeZ = getZ() + fwdZ * 0.3;
-
-        // Direction toward scan target, spread into a small cone
-        Vec3 dir = target.subtract(eyeX, eyeY, eyeZ).normalize().scale(0.35);
-
-        // count=0 → offsets used as exact velocity (directional particles)
-        for (int i = 0; i < 8; i++) {
-            double vx = dir.x + (random.nextDouble() - 0.5) * 0.12;
-            double vy = dir.y + (random.nextDouble() - 0.5) * 0.12;
-            double vz = dir.z + (random.nextDouble() - 0.5) * 0.12;
-            serverLevel.sendParticles(ParticleTypes.SOUL_FIRE_FLAME,
-                    eyeX, eyeY, eyeZ, 0, vx, vy, vz, 1.0);
-        }
-    }
-
-    // ── Fire trail from the nozzle (back of model, positive Z) ───────────────
-    private void spawnNozzleParticles(ServerLevel serverLevel) {
-        // Nozzle: ~0.45 blocks behind entity center, near the bottom
-        float  yaw  = (float) Math.toRadians(getYRot());
-        double backX =  Math.sin(yaw);
-        double backZ = -Math.cos(yaw);
-
-        double nx = getX() + backX * 0.45;
-        double ny = getY() + 0.2;
-        double nz = getZ() + backZ * 0.45;
-
-        serverLevel.sendParticles(ParticleTypes.FLAME,
-                nx, ny, nz, 2, 0.04, 0.04, 0.04, 0.02);
+    // ── Public accessors for client-side render layer ────────────────────────
+    public boolean isScanning() {
+        return entityData.get(SCANNING);
     }
 
     // ── GeckoLib ─────────────────────────────────────────────────────────────
@@ -301,10 +254,13 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
 
         @Override
         public void start() {
-            double x = sentinel.getX() + (sentinel.random.nextDouble() - 0.5) * 10.0;
-            double y = sentinel.getY() + (sentinel.random.nextDouble() - 0.5) * 4.0 + 1.5;
-            double z = sentinel.getZ() + (sentinel.random.nextDouble() - 0.5) * 10.0;
-            y = Math.max(y, sentinel.level().getMinBuildHeight() + 8.0);
+            double x = sentinel.getX() + (sentinel.random.nextDouble() - 0.5) * 12.0;
+            // Symmetric Y range: ±2 blocks around current height — bee-like horizontal exploration
+            double y = sentinel.getY() + (sentinel.random.nextDouble() * 2.0 - 1.0) * 2.0;
+            double z = sentinel.getZ() + (sentinel.random.nextDouble() - 0.5) * 12.0;
+            // Keep within world bounds
+            y = Math.max(sentinel.level().getMinBuildHeight() + 5.0,
+                    Math.min(y, sentinel.level().getMaxBuildHeight() - 20.0));
             sentinel.getMoveControl().setWantedPosition(x, y, z, 0.8);
         }
     }

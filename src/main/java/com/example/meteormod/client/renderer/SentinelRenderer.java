@@ -19,9 +19,8 @@ public class SentinelRenderer extends GeoEntityRenderer<SentinelEntity> {
 
     public SentinelRenderer(EntityRendererProvider.Context context) {
         super(context, new SentinelModel());
-
-        // Shadow radius — adjust to match the model footprint
         this.shadowRadius = 0.4f;
+        this.addRenderLayer(new SentinelParticleLayer(this));
     }
 
     // Override render() if you need to apply a global scale or offset:
