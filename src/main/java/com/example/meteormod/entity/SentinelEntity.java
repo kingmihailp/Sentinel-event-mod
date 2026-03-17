@@ -13,7 +13,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.control.FlyingMoveControl;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
-import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
@@ -30,7 +29,6 @@ import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.*;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
-import java.util.EnumSet;
 import java.util.List;
 
 public class SentinelEntity extends PathfinderMob implements GeoEntity {
@@ -39,21 +37,26 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     private static final EntityDataAccessor<Boolean> SCANNING =
             SynchedEntityData.defineId(SentinelEntity.class, EntityDataSerializers.BOOLEAN);
 
-    // ── Animations (names match keys in sentinel.animation.json) ────────────
+    // ── Animation — only idle (scan animation removed) ───────────────────────
     private static final RawAnimation ANIM_IDLE = RawAnimation.begin().thenLoop("idle");
-    private static final RawAnimation ANIM_SCAN = RawAnimation.begin().thenLoop("scan");
 
     private final AnimatableInstanceCache animCache = GeckoLibUtil.createInstanceCache(this);
 
     // ── Scan state ───────────────────────────────────────────────────────────
-    private static final int SCAN_DURATION     = 60;   // ticks of active scanning
-    private static final int SCAN_COOLDOWN_MIN = 120;  // min ticks between scans
-    private static final int SCAN_COOLDOWN_RND = 100;  // random extra ticks
+    private static final int SCAN_DURATION     = 60;
+    private static final int SCAN_COOLDOWN_MIN = 120;
+    private static final int SCAN_COOLDOWN_RND = 100;
 
-    private int    scanTimer        = 0;
-    private int    scanCooldown     = SCAN_COOLDOWN_MIN;
-    private BlockPos scanBlockPos   = null;
+    private int      scanTimer        = 0;
+    private int      scanCooldown     = SCAN_COOLDOWN_MIN;
+    private BlockPos scanBlockPos     = null;
     private Entity   scanEntityTarget = null;
+
+    // ── Manual flight state ──────────────────────────────────────────────────
+    // The goal system + FlyingPathNavigation is unreliable for open-world hovering.
+    // We drive movement directly via deltaMovement instead.
+    private Vec3 flyTarget    = null;
+    private int  retargetIn   = 0;
 
     // ────────────────────────────────────────────────────────────────────────
 
@@ -69,7 +72,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         builder.define(SCANNING, false);
     }
 
-    // ── Flying navigation ────────────────────────────────────────────────────
     @Override
     protected PathNavigation createNavigation(Level level) {
         FlyingPathNavigation nav = new FlyingPathNavigation(this, level);
@@ -82,19 +84,18 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     // ── Attributes ───────────────────────────────────────────────────────────
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
-                .add(Attributes.MAX_HEALTH,     30.0)
-                .add(Attributes.MOVEMENT_SPEED,  0.18)   // slow, bee-like
-                .add(Attributes.FLYING_SPEED,    0.6)    // required by FlyingMoveControl
-                .add(Attributes.ATTACK_DAMAGE,   4.0)
-                .add(Attributes.FOLLOW_RANGE,   16.0)
-                .add(Attributes.ARMOR,           2.0);
+                .add(Attributes.MAX_HEALTH,    30.0)
+                .add(Attributes.MOVEMENT_SPEED, 0.18)
+                .add(Attributes.FLYING_SPEED,   0.6)
+                .add(Attributes.ATTACK_DAMAGE,  4.0)
+                .add(Attributes.FOLLOW_RANGE,  16.0)
+                .add(Attributes.ARMOR,          2.0);
     }
 
     // ── Goals ────────────────────────────────────────────────────────────────
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(1, new FloatGoal(this));
-        this.goalSelector.addGoal(2, new RandomFlyWanderGoal(this));
         this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 8.0f));
         this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
 
@@ -102,7 +103,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, true));
     }
 
-    // No fall damage for a flying entity
     @Override
     public void checkFallDamage(double y, boolean onGround, BlockState state, BlockPos pos) {}
 
@@ -112,13 +112,14 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.tick();
 
         if (level().isClientSide()) {
-            // Client-side visual particles — animation position is computed analytically
-            // matching the idle/scan keyframes in sentinel.animation.json.
             if (tickCount % 2 == 0) spawnClientNozzleParticles();
             if (entityData.get(SCANNING) && tickCount % 5 == 0) spawnClientScanParticles();
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level();
+
+        // ── Bee-like flight driven directly via deltaMovement ─────────────────
+        tickManualFlight();
 
         // ── Scanning state machine ────────────────────────────────────────────
         if (scanTimer > 0) {
@@ -126,7 +127,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             scanTimer--;
 
             if (scanBlockPos != null) {
-                // Block scan: look at block, optionally break at end
                 Vec3 target = Vec3.atCenterOf(scanBlockPos);
                 getLookControl().setLookAt(target.x, target.y, target.z, 30f, 30f);
 
@@ -134,16 +134,13 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
                     BlockState state = serverLevel.getBlockState(scanBlockPos);
                     if (!state.isAir() && state.getFluidState().isEmpty()) {
                         if (random.nextBoolean()) {
-                            // Pick up (break without drop)
                             serverLevel.destroyBlock(scanBlockPos, false);
                         }
-                        // else: leave the block alone
                     }
                     scanBlockPos = null;
                 }
 
             } else if (scanEntityTarget != null) {
-                // Entity scan: look at entity
                 if (!scanEntityTarget.isAlive()) {
                     scanEntityTarget = null;
                     scanTimer = 0;
@@ -160,7 +157,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             }
 
         } else {
-            // Waiting between scans
             entityData.set(SCANNING, false);
             if (--scanCooldown <= 0) {
                 startScan(serverLevel);
@@ -168,9 +164,49 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         }
     }
 
-    // ── Find a target and begin scan ─────────────────────────────────────────
+    // ── Direct flight: pick random nearby targets, lerp deltaMovement ─────────
+    private void tickManualFlight() {
+        setNoGravity(true);
+
+        // Pick a new target when none exists, timer runs out, or we've arrived
+        if (flyTarget == null || --retargetIn <= 0 || distanceToSqr(flyTarget) < 3.0) {
+            double tx = getX() + (random.nextDouble() - 0.5) * 14.0;
+            // ±1.5 blocks vertically — explores territory, not sky
+            double ty = getY() + (random.nextDouble() * 2.0 - 1.0) * 1.5;
+            double tz = getZ() + (random.nextDouble() - 0.5) * 14.0;
+            ty = Math.max(level().getMinBuildHeight() + 5.0,
+                    Math.min(ty, level().getMaxBuildHeight() - 10.0));
+            flyTarget  = new Vec3(tx, ty, tz);
+            retargetIn = 50 + random.nextInt(70); // 2.5–6 sec per target
+        }
+
+        Vec3 toTarget = flyTarget.subtract(position());
+        double dist   = toTarget.length();
+
+        if (dist > 0.1) {
+            // Slow down smoothly as we approach; cap at bee-like 0.12 b/t
+            double speed = Math.min(0.12, dist * 0.05 + 0.03);
+            Vec3   dir   = toTarget.normalize().scale(speed);
+            Vec3   cur   = getDeltaMovement();
+
+            // Exponential smoothing — gives the floaty, inertia-heavy bee feel
+            setDeltaMovement(
+                cur.x * 0.75 + dir.x * 0.25,
+                cur.y * 0.75 + dir.y * 0.25,
+                cur.z * 0.75 + dir.z * 0.25
+            );
+
+            // Face the direction of travel (horizontal only)
+            double hLen = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+            if (hLen > 0.002) {
+                setYRot((float) Math.toDegrees(Math.atan2(-dir.x, dir.z)));
+                yHeadRot = getYRot();
+            }
+        }
+    }
+
+    // ── Find scan target ──────────────────────────────────────────────────────
     private void startScan(ServerLevel serverLevel) {
-        // 40% chance: scan a nearby entity
         if (random.nextFloat() < 0.4f) {
             List<Entity> nearby = serverLevel.getEntities(this, getBoundingBox().inflate(8.0));
             if (!nearby.isEmpty()) {
@@ -181,7 +217,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             }
         }
 
-        // Find a nearby solid block
         BlockPos center = blockPosition();
         for (int attempt = 0; attempt < 15; attempt++) {
             BlockPos candidate = center.offset(
@@ -198,50 +233,34 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             }
         }
 
-        // Nothing found — short retry delay
         scanCooldown = 40;
     }
 
     // ── Client-side particle helpers ──────────────────────────────────────────
-    // Animation data from sentinel.animation.json:
-    //   idle : ALL bone Y +21 px, X rot +15 deg — period 120 ticks (catmullrom ≈ sine)
-    //   scan : HANDS bone rotX only — ALL bone does NOT move during scan
-    //
-    // Model constants (pixels):
-    //   ALL pivot  : (-0.00488, 5.31873,  1.29378)
-    //   Nozzle     :  (0,       4.0,      9.0)   — thruster geometry, model +Z = back
-    //   Eye        :  (0,       5.5,     -5.5)   — front-face lens, model -Z = front
+    // Animation constants (sentinel.animation.json):
+    //   idle : ALL bone Y +21 px, X rot +15 deg, period 120 ticks
+    // Model constants (absolute model coords, pixels):
+    //   ALL pivot : (-0.00488, 5.31873, 1.29378)
+    //   Nozzle    :  (0, 4.0, 9.0)   — back of model (+Z)
+    //   Eye       :  (0, 5.5, -5.5)  — front of model (-Z)
 
-    /** Approximate ALL bone Y-offset (blocks) from the idle animation. */
     private float idleAnimY() {
-        // scan animation plays while SCANNING=true; no ALL-bone Y movement during scan
-        if (entityData.get(SCANNING)) return 0f;
         float phase = (tickCount % 120) / 120.0f;
         return (21.0f / 16.0f) * (float) Math.sin(Math.PI * phase);
     }
 
-    /** Approximate ALL bone X-rotation (radians) from the idle animation. */
     private float idleAnimRotX() {
-        if (entityData.get(SCANNING)) return 0f;
         float phase = (tickCount % 120) / 120.0f;
         return (float) Math.toRadians(15.0f * Math.sin(Math.PI * phase));
     }
 
-    /**
-     * Compute a model-space point's world position after applying
-     * the ALL bone's animated translation + X rotation.
-     *
-     * @param modelY  absolute model Y of the point (pixels)
-     * @param modelZ  absolute model Z of the point (pixels)
-     * @return  double[3] = {worldX, worldY, worldZ}
-     */
     private double[] bonePointToWorld(float modelY, float modelZ) {
-        float allPivY  = 5.31873f;
-        float allPivZ  = 1.29378f;
-        float animY    = idleAnimY() * 16.0f;   // back to pixels
-        float rotX     = idleAnimRotX();
-        float cosR     = (float) Math.cos(rotX);
-        float sinR     = (float) Math.sin(rotX);
+        float allPivY = 5.31873f;
+        float allPivZ = 1.29378f;
+        float animY   = idleAnimY() * 16.0f;
+        float rotX    = idleAnimRotX();
+        float cosR    = (float) Math.cos(rotX);
+        float sinR    = (float) Math.sin(rotX);
 
         float dy = modelY - allPivY;
         float dz = modelZ - allPivZ;
@@ -249,7 +268,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         float finalY_px = (allPivY + animY) + dy * cosR - dz * sinR;
         float finalZ_px = allPivZ           + dy * sinR + dz * cosR;
 
-        // model +Z = entity back;  world: x += sin(yaw)*z_m,  z -= cos(yaw)*z_m
         float yaw = (float) Math.toRadians(getYRot());
         return new double[]{
             getX() + (finalZ_px / 16.0) *  Math.sin(yaw),
@@ -258,7 +276,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         };
     }
 
-    /** FLAME trail from the nozzle (model z=+9, y=4). */
     private void spawnClientNozzleParticles() {
         double[] p = bonePointToWorld(4.0f, 9.0f);
         for (int i = 0; i < 2; i++) {
@@ -269,7 +286,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         }
     }
 
-    /** ELECTRIC_SPARK beam from the eye (model z=-5.5, y=5.5) toward look target. */
     private void spawnClientScanParticles() {
         double[] p = bonePointToWorld(5.5f, -5.5f);
         float headYaw   = (float) Math.toRadians(getYHeadRot());
@@ -278,7 +294,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         double ly = -Math.sin(headPitch);
         double lz =  Math.cos(headYaw) * Math.cos(headPitch);
         for (int i = 0; i < 8; i++) {
-            level().addParticle(ParticleTypes.ELECTRIC_SPARK, p[0], p[1], p[2],
+            level().addParticle(ParticleTypes.NAUTILUS, p[0], p[1], p[2],
                     lx * 0.3 + (random.nextDouble() - 0.5) * 0.1,
                     ly * 0.3 + (random.nextDouble() - 0.5) * 0.1,
                     lz * 0.3 + (random.nextDouble() - 0.5) * 0.1);
@@ -290,15 +306,11 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         return entityData.get(SCANNING);
     }
 
-    // ── GeckoLib ─────────────────────────────────────────────────────────────
+    // ── GeckoLib — always idle ────────────────────────────────────────────────
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar registrar) {
-        registrar.add(new AnimationController<>(this, "main", 5, state -> {
-            if (entityData.get(SCANNING)) {
-                return state.setAndContinue(ANIM_SCAN);
-            }
-            return state.setAndContinue(ANIM_IDLE);
-        }));
+        registrar.add(new AnimationController<>(this, "main", 5,
+                state -> state.setAndContinue(ANIM_IDLE)));
     }
 
     @Override
@@ -319,39 +331,5 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.readAdditionalSaveData(tag);
         scanTimer    = tag.getInt("ScanTimer");
         scanCooldown = tag.getInt("ScanCooldown");
-    }
-
-    // ── Inner goal: random 3-D flying wander (like bee) ──────────────────────
-    static class RandomFlyWanderGoal extends Goal {
-
-        private final SentinelEntity sentinel;
-
-        RandomFlyWanderGoal(SentinelEntity sentinel) {
-            this.sentinel = sentinel;
-            setFlags(EnumSet.of(Flag.MOVE));
-        }
-
-        @Override
-        public boolean canUse() {
-            return !sentinel.getMoveControl().hasWanted()
-                    && sentinel.random.nextInt(10) == 0;
-        }
-
-        @Override
-        public boolean canContinueToUse() {
-            return sentinel.getMoveControl().hasWanted();
-        }
-
-        @Override
-        public void start() {
-            double x = sentinel.getX() + (sentinel.random.nextDouble() - 0.5) * 12.0;
-            // Symmetric Y range: ±2 blocks around current height — bee-like horizontal exploration
-            double y = sentinel.getY() + (sentinel.random.nextDouble() * 2.0 - 1.0) * 2.0;
-            double z = sentinel.getZ() + (sentinel.random.nextDouble() - 0.5) * 12.0;
-            // Keep within world bounds
-            y = Math.max(sentinel.level().getMinBuildHeight() + 5.0,
-                    Math.min(y, sentinel.level().getMaxBuildHeight() - 20.0));
-            sentinel.getMoveControl().setWantedPosition(x, y, z, 0.8);
-        }
     }
 }
