@@ -7,7 +7,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.entity.animal.Bee;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -125,16 +124,16 @@ public class MeteorEntity extends Entity {
                 Level.ExplosionInteraction.BLOCK
         );
 
-        // Spawn 1–4 bees near impact point
+        // Spawn 1–3 Sentinels near impact point
         if (level instanceof ServerLevel serverLevel) {
-            int beeCount = 1 + serverLevel.random.nextInt(4);
-            for (int i = 0; i < beeCount; i++) {
-                Bee bee = new Bee(EntityType.BEE, level);
+            int count = 1 + serverLevel.random.nextInt(3);
+            for (int i = 0; i < count; i++) {
+                SentinelEntity sentinel = new SentinelEntity(ModEntities.SENTINEL.get(), level);
                 double offsetX = (serverLevel.random.nextDouble() - 0.5) * 4.0;
                 double offsetZ = (serverLevel.random.nextDouble() - 0.5) * 4.0;
-                bee.setPos(x + offsetX, y + 1.0, z + offsetZ);
-                bee.setHealth(bee.getMaxHealth());
-                serverLevel.addFreshEntity(bee);
+                sentinel.setPos(x + offsetX, y + 1.0, z + offsetZ);
+                sentinel.setHealth(sentinel.getMaxHealth());
+                serverLevel.addFreshEntity(sentinel);
             }
         }
     }

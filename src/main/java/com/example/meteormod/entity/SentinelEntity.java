@@ -20,6 +20,9 @@ import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -96,7 +99,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     // ── Attributes ───────────────────────────────────────────────────────────
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
-                .add(Attributes.MAX_HEALTH,    30.0)
+                .add(Attributes.MAX_HEALTH,    40.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.18)
                 .add(Attributes.FLYING_SPEED,   0.6)
                 .add(Attributes.ATTACK_DAMAGE,  4.0)
@@ -117,6 +120,16 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
 
     @Override
     public void checkFallDamage(double y, boolean onGround, BlockState state, BlockPos pos) {}
+
+    @Override
+    protected SoundEvent getHurtSound(DamageSource source) {
+        return SoundEvents.BLAZE_HURT;
+    }
+
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.BLAZE_DEATH;
+    }
 
     // ── Main tick ─────────────────────────────────────────────────────────────
     @Override
