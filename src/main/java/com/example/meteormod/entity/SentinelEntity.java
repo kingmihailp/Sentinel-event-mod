@@ -23,7 +23,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.particles.DustColorTransitionOptions;
 import net.minecraft.core.particles.ParticleTypes;
+import org.joml.Vector3f;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.*;
@@ -37,10 +39,16 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     private static final EntityDataAccessor<Boolean> SCANNING =
             SynchedEntityData.defineId(SentinelEntity.class, EntityDataSerializers.BOOLEAN);
 
-    // ── Animation — only idle (scan animation removed) ───────────────────────
     private static final RawAnimation ANIM_IDLE = RawAnimation.begin().thenLoop("idle");
 
     private final AnimatableInstanceCache animCache = GeckoLibUtil.createInstanceCache(this);
+
+    // ── Scan particles: yellow → red dust transition ─────────────────────────
+    private static final DustColorTransitionOptions SCAN_DUST =
+            new DustColorTransitionOptions(
+                    new Vector3f(1.0f, 0.9f, 0.0f),  // yellow
+                    new Vector3f(1.0f, 0.05f, 0.0f), // red
+                    1.2f);
 
     // ── Scan state ───────────────────────────────────────────────────────────
     private static final int SCAN_DURATION     = 60;
@@ -53,10 +61,8 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     private Entity   scanEntityTarget = null;
 
     // ── Manual flight state ──────────────────────────────────────────────────
-    // The goal system + FlyingPathNavigation is unreliable for open-world hovering.
-    // We drive movement directly via deltaMovement instead.
-    private Vec3 flyTarget    = null;
-    private int  retargetIn   = 0;
+    private Vec3 flyTarget  = null;
+    private int  retargetIn = 0;
 
     // ────────────────────────────────────────────────────────────────────────
 
@@ -112,13 +118,15 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.tick();
 
         if (level().isClientSide()) {
+            // Nozzle trail every 2 ticks
             if (tickCount % 2 == 0) spawnClientNozzleParticles();
+            // Scan wave every 5 ticks while actively scanning
             if (entityData.get(SCANNING) && tickCount % 5 == 0) spawnClientScanParticles();
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level();
 
-        // ── Bee-like flight driven directly via deltaMovement ─────────────────
+        // Flight first — scan logic may override head yaw afterward
         tickManualFlight();
 
         // ── Scanning state machine ────────────────────────────────────────────
@@ -164,39 +172,44 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         }
     }
 
-    // ── Direct flight: pick random nearby targets, lerp deltaMovement ─────────
+    // ── Direct bee-like flight via deltaMovement ──────────────────────────────
     private void tickManualFlight() {
         setNoGravity(true);
 
-        // Pick a new target when none exists, timer runs out, or we've arrived
+        // While scanning: decelerate and stop so the entity looks at the target
+        if (entityData.get(SCANNING)) {
+            setDeltaMovement(getDeltaMovement().scale(0.8));
+            return; // do NOT touch yHeadRot — scan logic controls the look direction
+        }
+
+        // Pick a new wander target
         if (flyTarget == null || --retargetIn <= 0 || distanceToSqr(flyTarget) < 3.0) {
             double tx = getX() + (random.nextDouble() - 0.5) * 14.0;
-            // ±1.5 blocks vertically — explores territory, not sky
-            double ty = getY() + (random.nextDouble() * 2.0 - 1.0) * 1.5;
+            // ±4 blocks vertically — allows proper up AND down movement
+            double ty = getY() + (random.nextDouble() * 2.0 - 1.0) * 4.0;
             double tz = getZ() + (random.nextDouble() - 0.5) * 14.0;
             ty = Math.max(level().getMinBuildHeight() + 5.0,
                     Math.min(ty, level().getMaxBuildHeight() - 10.0));
             flyTarget  = new Vec3(tx, ty, tz);
-            retargetIn = 50 + random.nextInt(70); // 2.5–6 sec per target
+            retargetIn = 50 + random.nextInt(70);
         }
 
         Vec3 toTarget = flyTarget.subtract(position());
         double dist   = toTarget.length();
 
         if (dist > 0.1) {
-            // Slow down smoothly as we approach; cap at bee-like 0.12 b/t
             double speed = Math.min(0.12, dist * 0.05 + 0.03);
             Vec3   dir   = toTarget.normalize().scale(speed);
             Vec3   cur   = getDeltaMovement();
 
-            // Exponential smoothing — gives the floaty, inertia-heavy bee feel
             setDeltaMovement(
                 cur.x * 0.75 + dir.x * 0.25,
-                cur.y * 0.75 + dir.y * 0.25,
+                // Less inertia on Y so the entity actually descends/ascends
+                cur.y * 0.55 + dir.y * 0.45,
                 cur.z * 0.75 + dir.z * 0.25
             );
 
-            // Face the direction of travel (horizontal only)
+            // Face the direction of travel
             double hLen = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
             if (hLen > 0.002) {
                 setYRot((float) Math.toDegrees(Math.atan2(-dir.x, dir.z)));
@@ -237,67 +250,48 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     }
 
     // ── Client-side particle helpers ──────────────────────────────────────────
-    // Animation constants (sentinel.animation.json):
-    //   idle : ALL bone Y +21 px, X rot +15 deg, period 120 ticks
-    // Model constants (absolute model coords, pixels):
-    //   ALL pivot : (-0.00488, 5.31873, 1.29378)
-    //   Nozzle    :  (0, 4.0, 9.0)   — back of model (+Z)
-    //   Eye       :  (0, 5.5, -5.5)  — front of model (-Z)
+    // Nozzle position: fixed back-offset from entity center.
+    // No animation formula — avoids drift caused by GeckoLib using wall-clock
+    // time while tickCount is game-tick-based.
 
-    private float idleAnimY() {
-        float phase = (tickCount % 120) / 120.0f;
-        return (21.0f / 16.0f) * (float) Math.sin(Math.PI * phase);
-    }
-
-    private float idleAnimRotX() {
-        float phase = (tickCount % 120) / 120.0f;
-        return (float) Math.toRadians(15.0f * Math.sin(Math.PI * phase));
-    }
-
-    private double[] bonePointToWorld(float modelY, float modelZ) {
-        float allPivY = 5.31873f;
-        float allPivZ = 1.29378f;
-        float animY   = idleAnimY() * 16.0f;
-        float rotX    = idleAnimRotX();
-        float cosR    = (float) Math.cos(rotX);
-        float sinR    = (float) Math.sin(rotX);
-
-        float dy = modelY - allPivY;
-        float dz = modelZ - allPivZ;
-
-        float finalY_px = (allPivY + animY) + dy * cosR - dz * sinR;
-        float finalZ_px = allPivZ           + dy * sinR + dz * cosR;
-
-        float yaw = (float) Math.toRadians(getYRot());
-        return new double[]{
-            getX() + (finalZ_px / 16.0) *  Math.sin(yaw),
-            getY() +  finalY_px / 16.0,
-            getZ() + (finalZ_px / 16.0) * -Math.cos(yaw)
-        };
-    }
-
+    /** FLAME trail from the nozzle (back of model, approx 0.5 blocks behind). */
     private void spawnClientNozzleParticles() {
-        double[] p = bonePointToWorld(4.0f, 9.0f);
+        float  yaw  = (float) Math.toRadians(getYRot());
+        double nx   = getX() + Math.sin(yaw) * 0.5;
+        double ny   = getY() + 0.28;            // fixed height — no drift
+        double nz   = getZ() - Math.cos(yaw) * 0.5;
+
         for (int i = 0; i < 2; i++) {
-            level().addParticle(ParticleTypes.FLAME, p[0], p[1], p[2],
-                    (random.nextDouble() - 0.5) * 0.06,
-                    (random.nextDouble() - 0.5) * 0.06,
-                    (random.nextDouble() - 0.5) * 0.06);
+            level().addParticle(ParticleTypes.FLAME, nx, ny, nz,
+                    (random.nextDouble() - 0.5) * 0.07,
+                    (random.nextDouble() - 0.5) * 0.07,
+                    (random.nextDouble() - 0.5) * 0.07);
         }
     }
 
+    /**
+     * Yellow-to-red dust_color_transition wave from the eye toward the scan target.
+     * Spawns 8 particles every 5 ticks in a narrow cone — creates a visible pulse.
+     */
     private void spawnClientScanParticles() {
-        double[] p = bonePointToWorld(5.5f, -5.5f);
-        float headYaw   = (float) Math.toRadians(getYHeadRot());
-        float headPitch = (float) Math.toRadians(getXRot());
+        // Eye: front of model, approx 0.35 blocks forward, at eye level
+        float  yaw  = (float) Math.toRadians(getYRot());
+        double ex   = getX() - Math.sin(yaw) * 0.35;
+        double ey   = getEyeY() - 0.15;
+        double ez   = getZ() + Math.cos(yaw) * 0.35;
+
+        // Shoot toward where the entity is looking (head yaw + pitch, synced from server)
+        float  headYaw   = (float) Math.toRadians(getYHeadRot());
+        float  headPitch = (float) Math.toRadians(getXRot());
         double lx = -Math.sin(headYaw) * Math.cos(headPitch);
         double ly = -Math.sin(headPitch);
         double lz =  Math.cos(headYaw) * Math.cos(headPitch);
+
         for (int i = 0; i < 8; i++) {
-            level().addParticle(ParticleTypes.NAUTILUS, p[0], p[1], p[2],
-                    lx * 0.3 + (random.nextDouble() - 0.5) * 0.1,
-                    ly * 0.3 + (random.nextDouble() - 0.5) * 0.1,
-                    lz * 0.3 + (random.nextDouble() - 0.5) * 0.1);
+            double vx = lx * 0.4 + (random.nextDouble() - 0.5) * 0.12;
+            double vy = ly * 0.4 + (random.nextDouble() - 0.5) * 0.12;
+            double vz = lz * 0.4 + (random.nextDouble() - 0.5) * 0.12;
+            level().addParticle(SCAN_DUST, ex, ey, ez, vx, vy, vz);
         }
     }
 
