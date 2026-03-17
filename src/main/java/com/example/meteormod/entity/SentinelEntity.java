@@ -53,6 +53,8 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
 
     // Wall-clock start time for animation phase sync with GeckoLib
     private long spawnMs = -1;
+    // Client-side wave state: age 0-39 as ring travels 0→5 blocks from eye
+    private int scanWaveAge = -1;
 
     // ── Scan state ───────────────────────────────────────────────────────────
     private static final int SCAN_DURATION     = 60;
@@ -125,8 +127,14 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             if (spawnMs < 0) spawnMs = Util.getMillis(); // init animation clock
             // Nozzle trail every 2 ticks
             if (tickCount % 2 == 0) spawnClientNozzleParticles();
-            // Scan ring-wave pulse every 10 ticks while actively scanning
-            if (entityData.get(SCANNING) && tickCount % 10 == 0) spawnClientScanParticles();
+            // Scan ring wave: advance one ring per tick while scanning
+            if (entityData.get(SCANNING)) {
+                if (scanWaveAge < 0) scanWaveAge = 0;
+                spawnClientScanParticles();
+                if (++scanWaveAge >= 40) scanWaveAge = 0;
+            } else {
+                scanWaveAge = -1;
+            }
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level();
@@ -323,10 +331,16 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
 
     /**
      * Yellow-to-red dust_color_transition RING WAVE from the eye.
-     * Eye model-space center: (0, 5.75, −5.75) px (innermost eye face plate).
-     * 20 particles arranged in a ring perpendicular to the look direction,
-     * all flying forward — creates a clearly visible expanding pulse wave.
-     * Fires every 10 ticks so each ring is visually distinct.
+     *
+     * DustColorTransitionParticle ignores velocity (DustParticleBase zeroes it in
+     * the constructor), so particles cannot be moved with xd/yd/zd.
+     *
+     * Solution: each tick advance the ring POSITION along the look direction by
+     * one step (scanWaveAge / 40.0 * 5.0 blocks). Individual particles are
+     * stationary, but a new ring spawns 0.125 blocks further every tick — this
+     * creates a clearly visible expanding ring wave traveling toward the target.
+     * Dust particles live ~20 ticks, so ~20 ring slices are visible at once,
+     * spanning ~2.5 blocks of "tail" with the wave front moving outward.
      */
     private void spawnClientScanParticles() {
         // Animation-accurate eye position
@@ -340,30 +354,27 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         double ly = -Math.sin(headPitch);
         double lz =  Math.cos(headYaw) * Math.cos(headPitch);
 
-        // Two perpendicular vectors that span the ring plane:
-        // rightVec — horizontal, perpendicular to look direction
-        // upVec    — world up (0, 1, 0)
-        double rx = Math.cos(headYaw), ry = 0.0, rz = Math.sin(headYaw);
+        // Ring centre travels 0 → 5 blocks from the eye over 40 ticks, then loops
+        double d  = (scanWaveAge / 40.0) * 5.0;
+        double cx = ex + lx * d;
+        double cy = ey + ly * d;
+        double cz = ez + lz * d;
 
-        final int   COUNT      = 20;
-        final double FWD_SPEED = 0.60;
-        final double RAD_SPEED = 0.15;
-        final double RING_R    = 0.25; // spawn radius (blocks)
+        // Ring basis vectors: right (horizontal perp to look) + world up
+        double rx = Math.cos(headYaw), rz = Math.sin(headYaw);
+
+        final int    COUNT  = 14;
+        final double RING_R = 0.35; // ring radius in blocks
 
         for (int i = 0; i < COUNT; i++) {
             double angle = (2.0 * Math.PI / COUNT) * i;
             double ca = Math.cos(angle), sa = Math.sin(angle);
-
-            // Radial direction in the (right, up) plane
-            double rdx = rx * ca; // up component: (0, sa, 0)
-            double rdy = sa;
-            double rdz = rz * ca;
-
+            // velocity 0,0,0 — dust particles ignore velocity anyway
             level().addParticle(SCAN_DUST,
-                    ex + rdx * RING_R, ey + rdy * RING_R, ez + rdz * RING_R,
-                    lx * FWD_SPEED + rdx * RAD_SPEED,
-                    ly * FWD_SPEED + rdy * RAD_SPEED,
-                    lz * FWD_SPEED + rdz * RAD_SPEED);
+                    cx + rx * ca * RING_R,
+                    cy + sa * RING_R,
+                    cz + rz * ca * RING_R,
+                    0.0, 0.0, 0.0);
         }
     }
 
