@@ -24,6 +24,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.particles.ParticleTypes;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.*;
@@ -110,7 +111,13 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     public void tick() {
         super.tick();
 
-        if (level().isClientSide()) return;
+        if (level().isClientSide()) {
+            // Client-side visual particles — animation position is computed analytically
+            // matching the idle/scan keyframes in sentinel.animation.json.
+            if (tickCount % 2 == 0) spawnClientNozzleParticles();
+            if (entityData.get(SCANNING) && tickCount % 5 == 0) spawnClientScanParticles();
+            return;
+        }
         ServerLevel serverLevel = (ServerLevel) level();
 
         // ── Scanning state machine ────────────────────────────────────────────
@@ -195,7 +202,90 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         scanCooldown = 40;
     }
 
-    // ── Public accessors for client-side render layer ────────────────────────
+    // ── Client-side particle helpers ──────────────────────────────────────────
+    // Animation data from sentinel.animation.json:
+    //   idle : ALL bone Y +21 px, X rot +15 deg — period 120 ticks (catmullrom ≈ sine)
+    //   scan : HANDS bone rotX only — ALL bone does NOT move during scan
+    //
+    // Model constants (pixels):
+    //   ALL pivot  : (-0.00488, 5.31873,  1.29378)
+    //   Nozzle     :  (0,       4.0,      9.0)   — thruster geometry, model +Z = back
+    //   Eye        :  (0,       5.5,     -5.5)   — front-face lens, model -Z = front
+
+    /** Approximate ALL bone Y-offset (blocks) from the idle animation. */
+    private float idleAnimY() {
+        // scan animation plays while SCANNING=true; no ALL-bone Y movement during scan
+        if (entityData.get(SCANNING)) return 0f;
+        float phase = (tickCount % 120) / 120.0f;
+        return (21.0f / 16.0f) * (float) Math.sin(Math.PI * phase);
+    }
+
+    /** Approximate ALL bone X-rotation (radians) from the idle animation. */
+    private float idleAnimRotX() {
+        if (entityData.get(SCANNING)) return 0f;
+        float phase = (tickCount % 120) / 120.0f;
+        return (float) Math.toRadians(15.0f * Math.sin(Math.PI * phase));
+    }
+
+    /**
+     * Compute a model-space point's world position after applying
+     * the ALL bone's animated translation + X rotation.
+     *
+     * @param modelY  absolute model Y of the point (pixels)
+     * @param modelZ  absolute model Z of the point (pixels)
+     * @return  double[3] = {worldX, worldY, worldZ}
+     */
+    private double[] bonePointToWorld(float modelY, float modelZ) {
+        float allPivY  = 5.31873f;
+        float allPivZ  = 1.29378f;
+        float animY    = idleAnimY() * 16.0f;   // back to pixels
+        float rotX     = idleAnimRotX();
+        float cosR     = (float) Math.cos(rotX);
+        float sinR     = (float) Math.sin(rotX);
+
+        float dy = modelY - allPivY;
+        float dz = modelZ - allPivZ;
+
+        float finalY_px = (allPivY + animY) + dy * cosR - dz * sinR;
+        float finalZ_px = allPivZ           + dy * sinR + dz * cosR;
+
+        // model +Z = entity back;  world: x += sin(yaw)*z_m,  z -= cos(yaw)*z_m
+        float yaw = (float) Math.toRadians(getYRot());
+        return new double[]{
+            getX() + (finalZ_px / 16.0) *  Math.sin(yaw),
+            getY() +  finalY_px / 16.0,
+            getZ() + (finalZ_px / 16.0) * -Math.cos(yaw)
+        };
+    }
+
+    /** FLAME trail from the nozzle (model z=+9, y=4). */
+    private void spawnClientNozzleParticles() {
+        double[] p = bonePointToWorld(4.0f, 9.0f);
+        for (int i = 0; i < 2; i++) {
+            level().addParticle(ParticleTypes.FLAME, p[0], p[1], p[2],
+                    (random.nextDouble() - 0.5) * 0.06,
+                    (random.nextDouble() - 0.5) * 0.06,
+                    (random.nextDouble() - 0.5) * 0.06);
+        }
+    }
+
+    /** ELECTRIC_SPARK beam from the eye (model z=-5.5, y=5.5) toward look target. */
+    private void spawnClientScanParticles() {
+        double[] p = bonePointToWorld(5.5f, -5.5f);
+        float headYaw   = (float) Math.toRadians(getYHeadRot());
+        float headPitch = (float) Math.toRadians(getXRot());
+        double lx = -Math.sin(headYaw) * Math.cos(headPitch);
+        double ly = -Math.sin(headPitch);
+        double lz =  Math.cos(headYaw) * Math.cos(headPitch);
+        for (int i = 0; i < 8; i++) {
+            level().addParticle(ParticleTypes.ELECTRIC_SPARK, p[0], p[1], p[2],
+                    lx * 0.3 + (random.nextDouble() - 0.5) * 0.1,
+                    ly * 0.3 + (random.nextDouble() - 0.5) * 0.1,
+                    lz * 0.3 + (random.nextDouble() - 0.5) * 0.1);
+        }
+    }
+
+    // ── Public accessor ───────────────────────────────────────────────────────
     public boolean isScanning() {
         return entityData.get(SCANNING);
     }

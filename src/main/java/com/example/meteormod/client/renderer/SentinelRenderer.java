@@ -20,7 +20,6 @@ public class SentinelRenderer extends GeoEntityRenderer<SentinelEntity> {
     public SentinelRenderer(EntityRendererProvider.Context context) {
         super(context, new SentinelModel());
         this.shadowRadius = 0.4f;
-        this.addRenderLayer(new SentinelParticleLayer(this));
     }
 
     // Override render() if you need to apply a global scale or offset:
