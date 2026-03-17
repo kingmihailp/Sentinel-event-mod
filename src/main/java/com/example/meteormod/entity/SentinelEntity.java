@@ -23,6 +23,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.Util;
 import net.minecraft.core.particles.DustColorTransitionOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import org.joml.Vector3f;
@@ -48,7 +49,10 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             new DustColorTransitionOptions(
                     new Vector3f(1.0f, 0.9f, 0.0f),  // yellow
                     new Vector3f(1.0f, 0.05f, 0.0f), // red
-                    1.2f);
+                    1.5f);
+
+    // Wall-clock start time for animation phase sync with GeckoLib
+    private long spawnMs = -1;
 
     // ── Scan state ───────────────────────────────────────────────────────────
     private static final int SCAN_DURATION     = 60;
@@ -118,10 +122,11 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.tick();
 
         if (level().isClientSide()) {
+            if (spawnMs < 0) spawnMs = Util.getMillis(); // init animation clock
             // Nozzle trail every 2 ticks
             if (tickCount % 2 == 0) spawnClientNozzleParticles();
-            // Scan wave every 5 ticks while actively scanning
-            if (entityData.get(SCANNING) && tickCount % 5 == 0) spawnClientScanParticles();
+            // Scan ring-wave pulse every 10 ticks while actively scanning
+            if (entityData.get(SCANNING) && tickCount % 10 == 0) spawnClientScanParticles();
             return;
         }
         ServerLevel serverLevel = (ServerLevel) level();
@@ -250,19 +255,66 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     }
 
     // ── Client-side particle helpers ──────────────────────────────────────────
-    // Nozzle position: fixed back-offset from entity center.
-    // No animation formula — avoids drift caused by GeckoLib using wall-clock
-    // time while tickCount is game-tick-based.
 
-    /** FLAME trail from the nozzle (back of model, approx 0.5 blocks behind). */
+    /**
+     * Returns the idle-animation phase [0, 1) over the 6-second cycle.
+     * Uses wall-clock time (same clock as GeckoLib) to avoid tick-rate drift.
+     */
+    private double idleAnimPhase() {
+        if (spawnMs < 0) spawnMs = Util.getMillis();
+        return ((Util.getMillis() - spawnMs) % 6000L) / 6000.0;
+    }
+
+    /**
+     * Transforms a model-space point (in pixels) through the ALL-bone idle
+     * animation (Y translation + X rotation) and returns world coordinates.
+     *
+     * Model→world axis mapping (GeckoLib/Minecraft entity rendering, 180° Y flip):
+     *   model −Z → entity forward,  model −X → entity right,  model +Y → world up
+     */
+    private double[] animWorldPos(double mx, double my, double mz) {
+        double phase = idleAnimPhase();
+        // Catmullrom 0→21→0 px Y and 0→15→0° X — both approximate a half-cosine
+        double animYpx  = 10.5 * (1.0 - Math.cos(2 * Math.PI * phase));
+        double animXRad = Math.toRadians(7.5 * (1.0 - Math.cos(2 * Math.PI * phase)));
+
+        // ALL-bone pivot (pixels)
+        final double px = -0.00488, py = 5.31873, pz = 1.29378;
+
+        // Translate to pivot-relative space
+        double relY = my - py;
+        double relZ = mz - pz;
+
+        // Apply X rotation (tilts model forward/backward)
+        double cosA = Math.cos(animXRad), sinA = Math.sin(animXRad);
+        double rotY  = relY * cosA - relZ * sinA;
+        double rotZ  = relY * sinA + relZ * cosA;
+
+        // Final model-space coords with Y animation offset
+        double fz = rotZ + pz;           // Z after rotation + pivot restore
+        double fy = rotY + py + animYpx; // Y after rotation + pivot + anim
+        double fx = (mx - px) + px;      // X unchanged (no X anim on ALL bone)
+
+        // Convert to world using entity yaw
+        float  yawRad = (float) Math.toRadians(getYRot());
+        double sinYaw = Math.sin(yawRad), cosYaw = Math.cos(yawRad);
+
+        return new double[]{
+            getX() + (fz / 16.0) * sinYaw - (fx / 16.0) * cosYaw,
+            getY() + fy / 16.0,
+            getZ() - (fz / 16.0) * cosYaw - (fx / 16.0) * sinYaw
+        };
+    }
+
+    /**
+     * FLAME trail from the nozzle at the back of the model.
+     * Nozzle model-space center: (0, 5.0, 10.0) px (cluster of cubes at z≈9-11).
+     * Position is fully animation-aware — no drift vs GeckoLib.
+     */
     private void spawnClientNozzleParticles() {
-        float  yaw  = (float) Math.toRadians(getYRot());
-        double nx   = getX() + Math.sin(yaw) * 0.5;
-        double ny   = getY() + 0.28;            // fixed height — no drift
-        double nz   = getZ() - Math.cos(yaw) * 0.5;
-
+        double[] p = animWorldPos(0.0, 5.0, 10.0);
         for (int i = 0; i < 2; i++) {
-            level().addParticle(ParticleTypes.FLAME, nx, ny, nz,
+            level().addParticle(ParticleTypes.FLAME, p[0], p[1], p[2],
                     (random.nextDouble() - 0.5) * 0.07,
                     (random.nextDouble() - 0.5) * 0.07,
                     (random.nextDouble() - 0.5) * 0.07);
@@ -270,28 +322,48 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     }
 
     /**
-     * Yellow-to-red dust_color_transition wave from the eye toward the scan target.
-     * Spawns 8 particles every 5 ticks in a narrow cone — creates a visible pulse.
+     * Yellow-to-red dust_color_transition RING WAVE from the eye.
+     * Eye model-space center: (0, 5.75, −5.75) px (innermost eye face plate).
+     * 20 particles arranged in a ring perpendicular to the look direction,
+     * all flying forward — creates a clearly visible expanding pulse wave.
+     * Fires every 10 ticks so each ring is visually distinct.
      */
     private void spawnClientScanParticles() {
-        // Eye: front of model, approx 0.35 blocks forward, at eye level
-        float  yaw  = (float) Math.toRadians(getYRot());
-        double ex   = getX() - Math.sin(yaw) * 0.35;
-        double ey   = getEyeY() - 0.15;
-        double ez   = getZ() + Math.cos(yaw) * 0.35;
+        // Animation-accurate eye position
+        double[] ep = animWorldPos(0.0, 5.75, -5.75);
+        double ex = ep[0], ey = ep[1], ez = ep[2];
 
-        // Shoot toward where the entity is looking (head yaw + pitch, synced from server)
+        // Look direction from head yaw + pitch (synced from server)
         float  headYaw   = (float) Math.toRadians(getYHeadRot());
         float  headPitch = (float) Math.toRadians(getXRot());
         double lx = -Math.sin(headYaw) * Math.cos(headPitch);
         double ly = -Math.sin(headPitch);
         double lz =  Math.cos(headYaw) * Math.cos(headPitch);
 
-        for (int i = 0; i < 8; i++) {
-            double vx = lx * 0.4 + (random.nextDouble() - 0.5) * 0.12;
-            double vy = ly * 0.4 + (random.nextDouble() - 0.5) * 0.12;
-            double vz = lz * 0.4 + (random.nextDouble() - 0.5) * 0.12;
-            level().addParticle(SCAN_DUST, ex, ey, ez, vx, vy, vz);
+        // Two perpendicular vectors that span the ring plane:
+        // rightVec — horizontal, perpendicular to look direction
+        // upVec    — world up (0, 1, 0)
+        double rx = Math.cos(headYaw), ry = 0.0, rz = Math.sin(headYaw);
+
+        final int   COUNT      = 20;
+        final double FWD_SPEED = 0.60;
+        final double RAD_SPEED = 0.15;
+        final double RING_R    = 0.25; // spawn radius (blocks)
+
+        for (int i = 0; i < COUNT; i++) {
+            double angle = (2.0 * Math.PI / COUNT) * i;
+            double ca = Math.cos(angle), sa = Math.sin(angle);
+
+            // Radial direction in the (right, up) plane
+            double rdx = rx * ca; // up component: (0, sa, 0)
+            double rdy = sa;
+            double rdz = rz * ca;
+
+            level().addParticle(SCAN_DUST,
+                    ex + rdx * RING_R, ey + rdy * RING_R, ez + rdz * RING_R,
+                    lx * FWD_SPEED + rdx * RAD_SPEED,
+                    ly * FWD_SPEED + rdy * RAD_SPEED,
+                    lz * FWD_SPEED + rdz * RAD_SPEED);
         }
     }
 
