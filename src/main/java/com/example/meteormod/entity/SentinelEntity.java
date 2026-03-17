@@ -84,6 +84,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH,     30.0)
                 .add(Attributes.MOVEMENT_SPEED,  0.18)   // slow, bee-like
+                .add(Attributes.FLYING_SPEED,    0.6)    // required by FlyingMoveControl
                 .add(Attributes.ATTACK_DAMAGE,   4.0)
                 .add(Attributes.FOLLOW_RANGE,   16.0)
                 .add(Attributes.ARMOR,           2.0);
