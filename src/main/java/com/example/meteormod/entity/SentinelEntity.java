@@ -160,6 +160,23 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     }
 
     /**
+     * Death effect: burst of large smoke + small visual-only explosion.
+     * ExplosionInteraction.NONE means no block or entity damage — just the
+     * boom sound and flash effect visible to all nearby clients.
+     */
+    @Override
+    public void die(DamageSource source) {
+        super.die(source);
+        if (!level().isClientSide() && level() instanceof ServerLevel serverLevel) {
+            serverLevel.explode(this, getX(), getEyeY(), getZ(),
+                    2.5f, false, Level.ExplosionInteraction.NONE);
+            serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE,
+                    getX(), getEyeY(), getZ(),
+                    30, 0.45, 0.45, 0.45, 0.04);
+        }
+    }
+
+    /**
      * Called every server tick.
      *
      * Combat state machine:
@@ -247,6 +264,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         if (dist > 0.01) {
             setYRot((float) Math.toDegrees(Math.atan2(-dx, dz)));
             yHeadRot = getYRot();
+            yBodyRot = getYRot(); // keep body in sync so GeckoLib model matches nozzle calc
         }
     }
 
@@ -407,6 +425,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             if (hLen > 0.002) {
                 setYRot((float) Math.toDegrees(Math.atan2(-dir.x, dir.z)));
                 yHeadRot = getYRot();
+                yBodyRot = getYRot(); // keep body in sync so GeckoLib model matches nozzle calc
             }
         }
     }
@@ -491,9 +510,10 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         double fx = (mx - px) + px;      // X unchanged (no X anim on ALL bone)
 
         // Convert to world using entity yaw.
-        // Use mid-tick interpolation (partialTick=0.5) so the nozzle follows the
-        // model's visual position smoothly during turns rather than snapping 1 tick ahead.
-        float  yawRad = (float) Math.toRadians(Mth.rotLerp(0.5f, yRotO, getYRot()));
+        // GeckoLib renders the model with rotLerp(partialTick, yBodyRotO, yBodyRot).
+        // We use partialTick=0.5 as a mid-tick estimate; crucially we use yBodyRot so the
+        // reference frame is identical to the renderer — no break during turns.
+        float  yawRad = (float) Math.toRadians(Mth.rotLerp(0.5f, yBodyRotO, yBodyRot));
         double sinYaw = Math.sin(yawRad), cosYaw = Math.cos(yawRad);
 
         return new double[]{
