@@ -17,7 +17,6 @@ import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.FlyingPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
@@ -117,7 +116,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
                 .add(Attributes.MOVEMENT_SPEED, 0.18)
                 .add(Attributes.FLYING_SPEED,   0.6)
                 .add(Attributes.ATTACK_DAMAGE,  4.0)
-                .add(Attributes.FOLLOW_RANGE,  16.0)
+                .add(Attributes.FOLLOW_RANGE,  30.0)
                 .add(Attributes.ARMOR,          2.0);
     }
 
@@ -128,8 +127,8 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 8.0f));
         this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
 
+        // Only retaliate against attackers — no autonomous aggro on sight
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, true));
     }
 
     @Override
@@ -164,40 +163,94 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     }
 
     /**
-     * Called every server tick when in combat mode.
-     * Alternates shots between the right and left cannon (model geometry).
-     * Cannon tips in absolute model space: right=(-6.25, 1.5, -12.0)px, left=(6.25, 1.5, -12.0)px.
+     * Called every server tick.
+     *
+     * Combat state machine:
+     *  - Enters combat when hurt (combatTimer = 300).
+     *  - While target is within 30 blocks AND has line of sight: combatTimer resets to
+     *    300 each tick (never counts down), Sentinel shoots.
+     *  - When target goes out of range or hides: combatTimer counts down (15 s = 300 t).
+     *    If target reappears, combatTimer resets again.
+     *  - When combatTimer reaches 0: target cleared, return to peaceful wandering.
      */
-    private void tickShooting(ServerLevel serverLevel) {
-        if (combatTimer <= 0) return;
-        combatTimer--;
-
-        if (--shootCooldown > 0) return;
-        shootCooldown = 12; // one burst every 12 ticks (~0.6 s)
+    private void tickCombat(ServerLevel serverLevel) {
+        if (combatTimer <= 0 && getTarget() == null) return;
 
         LivingEntity target = getTarget();
+
+        // Target dead or gone — give up immediately
         if (target == null || !target.isAlive()) {
-            target = serverLevel.getNearestPlayer(this, 20.0);
-            if (target != null) setTarget(target);
+            combatTimer = 0;
+            setTarget(null);
+            return;
         }
-        if (target == null) return;
 
-        // Alternate: even shot = right cannon, odd shot = left cannon
-        boolean rightCannon = (shotCount % 2 == 0);
-        shotCount++;
+        // Line-of-sight + 30-block range check
+        boolean inRange = distanceTo(target) <= 30.0;
+        boolean canSee  = inRange && getSensing().hasLineOfSight(target);
 
-        Vec3 cannon = getCannonWorldPos(rightCannon);
+        if (canSee) {
+            // Player visible: keep combat active indefinitely, shoot
+            combatTimer = 300;
 
-        // Aim at target's eye level; normalize then scale to bullet speed
-        Vec3 dir = target.getEyePosition().subtract(cannon).normalize().scale(1.4);
+            if (--shootCooldown <= 0) {
+                shootCooldown = 12; // one burst every 12 ticks (~0.6 s)
 
-        SentinelBulletEntity bullet = new SentinelBulletEntity(ModEntities.SENTINEL_BULLET.get(), serverLevel);
-        bullet.setOwner(this);
-        bullet.setPos(cannon.x, cannon.y, cannon.z);
-        bullet.setDeltaMovement(dir);
-        serverLevel.addFreshEntity(bullet);
+                // Alternate: even shot = right cannon, odd shot = left cannon
+                boolean rightCannon = (shotCount % 2 == 0);
+                shotCount++;
 
-        playSound(SoundEvents.BLAZE_SHOOT, 0.7f, 1.1f + random.nextFloat() * 0.2f);
+                Vec3 cannon = getCannonWorldPos(rightCannon);
+                Vec3 dir    = target.getEyePosition().subtract(cannon).normalize().scale(1.4);
+
+                SentinelBulletEntity bullet = new SentinelBulletEntity(
+                        ModEntities.SENTINEL_BULLET.get(), serverLevel);
+                bullet.setOwner(this);
+                bullet.setPos(cannon.x, cannon.y, cannon.z);
+                bullet.setDeltaMovement(dir);
+                serverLevel.addFreshEntity(bullet);
+
+                playSound(SoundEvents.BLAZE_SHOOT, 0.7f, 1.1f + random.nextFloat() * 0.2f);
+            }
+        } else {
+            // Player hidden or out of range: 15-second countdown, then give up
+            combatTimer--;
+            if (combatTimer <= 0) {
+                combatTimer = 0;
+                setTarget(null); // return to peaceful
+            }
+        }
+    }
+
+    /**
+     * Pursuit flight toward target, keeping ~6-block combat distance.
+     * Called from tickManualFlight() when in combat and not scanning.
+     */
+    private void tickPursuitFlight(LivingEntity target) {
+        double dx   = target.getX() - getX();
+        double dz   = target.getZ() - getZ();
+        double dist = Math.sqrt(dx * dx + dz * dz); // horizontal distance
+
+        Vec3 cur = getDeltaMovement();
+
+        if (dist > 7.0) {
+            // Chase — accelerate horizontally toward target
+            double scale = 0.18 / dist;
+            setDeltaMovement(
+                cur.x * 0.75 + dx * scale * 0.25,
+                cur.y * 0.65 + (target.getEyeY() - getEyeY()) * 0.04,
+                cur.z * 0.75 + dz * scale * 0.25
+            );
+        } else {
+            // At combat range — hover in place
+            setDeltaMovement(cur.multiply(0.85, 0.75, 0.85));
+        }
+
+        // Always face the target during combat
+        if (dist > 0.01) {
+            setYRot((float) Math.toDegrees(Math.atan2(-dx, dz)));
+            yHeadRot = getYRot();
+        }
     }
 
     /**
@@ -247,11 +300,24 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         }
         ServerLevel serverLevel = (ServerLevel) level();
 
-        // Flight first — scan logic may override head yaw afterward
+        // Flight and combat run every tick
         tickManualFlight();
-        tickShooting(serverLevel);
+        tickCombat(serverLevel);
 
-        // ── Scanning state machine ────────────────────────────────────────────
+        // ── Abort scan and skip scanning entirely while in combat ─────────────
+        if (combatTimer > 0) {
+            if (scanTimer > 0) {
+                scanTimer        = 0;
+                scanBlockPos     = null;
+                scanEntityTarget = null;
+            }
+            entityData.set(SCANNING, false);
+            // Give the Sentinel a short scanning pause after combat ends
+            scanCooldown = SCAN_COOLDOWN_MIN;
+            return;
+        }
+
+        // ── Scanning state machine (peaceful only) ────────────────────────────
         if (scanTimer > 0) {
             entityData.set(SCANNING, true);
             scanTimer--;
@@ -298,10 +364,19 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     private void tickManualFlight() {
         setNoGravity(true);
 
-        // While scanning: decelerate and stop so the entity looks at the target
+        // While scanning: decelerate and stop; scan state-machine controls look direction
         if (entityData.get(SCANNING)) {
             setDeltaMovement(getDeltaMovement().scale(0.8));
-            return; // do NOT touch yHeadRot — scan logic controls the look direction
+            return;
+        }
+
+        // While in combat: pursue the target instead of wandering
+        if (combatTimer > 0) {
+            LivingEntity target = getTarget();
+            if (target != null && target.isAlive()) {
+                tickPursuitFlight(target);
+                return;
+            }
         }
 
         // Pick a new wander target
