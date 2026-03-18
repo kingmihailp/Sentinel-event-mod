@@ -23,10 +23,10 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.Util;
 import net.minecraft.core.particles.DustColorTransitionOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import org.joml.Vector3f;
@@ -54,8 +54,11 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
                     new Vector3f(1.0f, 0.05f, 0.0f), // red
                     1.5f);
 
-    // Wall-clock start time for animation phase sync with GeckoLib
-    private long spawnMs = -1;
+    // Tick-based animation phase sync with GeckoLib.
+    // GeckoLib advances animTime in ticks (ticks/20.0 = seconds), NOT wall-clock ms.
+    // Storing firstClientTick mirrors GeckoLib's per-entity "animation start tick".
+    // Multiple entities each get their own reference — no cross-entity phase bleed.
+    private int firstClientTick = -1;
     // Client-side wave state: age 0-39 as ring travels 0→5 blocks from eye
     private int scanWaveAge = -1;
 
@@ -137,7 +140,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.tick();
 
         if (level().isClientSide()) {
-            if (spawnMs < 0) spawnMs = Util.getMillis(); // init animation clock
+            if (firstClientTick < 0) firstClientTick = tickCount; // init animation clock
             // Nozzle trail every 2 ticks
             if (tickCount % 2 == 0) spawnClientNozzleParticles();
             // Scan ring wave: advance one ring per tick while scanning
@@ -278,12 +281,19 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     // ── Client-side particle helpers ──────────────────────────────────────────
 
     /**
-     * Returns the idle-animation phase [0, 1) over the 6-second cycle.
-     * Uses wall-clock time (same clock as GeckoLib) to avoid tick-rate drift.
+     * Returns the idle-animation phase [0, 1) over the 6-second (120-tick) cycle.
+     *
+     * GeckoLib tracks animTime in game ticks (animTime = relTick / 20.0 seconds),
+     * NOT in wall-clock milliseconds.  Using Util.getMillis() drifts from GeckoLib
+     * whenever TPS ≠ 20 (server lag, paused game, etc.), causing the nozzle to
+     * desync for each entity independently.
+     *
+     * Fix: count ticks relative to the entity's first client tick, exactly mirroring
+     * GeckoLib's per-entity "ticks since animation start" counter.
      */
     private double idleAnimPhase() {
-        if (spawnMs < 0) spawnMs = Util.getMillis();
-        return ((Util.getMillis() - spawnMs) % 6000L) / 6000.0;
+        if (firstClientTick < 0) firstClientTick = tickCount;
+        return ((tickCount - firstClientTick) % 120) / 120.0;
     }
 
     /**
@@ -316,8 +326,10 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         double fy = rotY + py + animYpx; // Y after rotation + pivot + anim
         double fx = (mx - px) + px;      // X unchanged (no X anim on ALL bone)
 
-        // Convert to world using entity yaw
-        float  yawRad = (float) Math.toRadians(getYRot());
+        // Convert to world using entity yaw.
+        // Use mid-tick interpolation (partialTick=0.5) so the nozzle follows the
+        // model's visual position smoothly during turns rather than snapping 1 tick ahead.
+        float  yawRad = (float) Math.toRadians(Mth.rotLerp(0.5f, yRotO, getYRot()));
         double sinYaw = Math.sin(yawRad), cosYaw = Math.cos(yawRad);
 
         return new double[]{
