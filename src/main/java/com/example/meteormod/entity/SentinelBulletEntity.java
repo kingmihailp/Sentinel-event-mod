@@ -18,11 +18,11 @@ public class SentinelBulletEntity extends ThrowableProjectile {
         this.setNoGravity(true);
     }
 
-    // ThrowableProjectile registers ITEM_STACK here; we must call super so that
-    // field is defined — without this the class fails to compile as not-abstract.
+    // ThrowableProjectile does not override defineSynchedData in NeoForge 1.21.1,
+    // so calling super would hit the abstract Entity method directly (illegal).
+    // Bullet has no synced data of its own.
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        super.defineSynchedData(builder);
     }
 
     @Override
