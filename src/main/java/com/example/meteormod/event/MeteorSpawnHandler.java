@@ -96,12 +96,12 @@ public class MeteorSpawnHandler {
     // ---------------------------------------------------------------------------
 
     /**
-     * Computes spawn parameters for 3–6 meteors and adds them to the queue.
-     * Nothing is actually spawned here — meteors are released one by one in
+     * Computes spawn parameters for 1 meteor and adds it to the queue.
+     * Nothing is actually spawned here — the meteor is released in
      * the tick handler above.
      */
     private static void enqueueMeteorShower(ServerLevel level, List<ServerPlayer> players) {
-        int count = 3 + level.random.nextInt(4); // 3–6
+        int count = 1;
 
         for (int i = 0; i < count; i++) {
             ServerPlayer target = players.get(level.random.nextInt(players.size()));

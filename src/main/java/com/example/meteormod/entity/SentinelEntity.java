@@ -54,11 +54,8 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
                     new Vector3f(1.0f, 0.05f, 0.0f), // red
                     1.5f);
 
-    // Tick-based animation phase sync with GeckoLib.
-    // GeckoLib advances animTime in ticks (ticks/20.0 = seconds), NOT wall-clock ms.
-    // Storing firstClientTick mirrors GeckoLib's per-entity "animation start tick".
-    // Multiple entities each get their own reference — no cross-entity phase bleed.
-    private int firstClientTick = -1;
+    // Animation phase is read directly from GeckoLib's AnimatableManager so it is
+    // always in sync with what GeoEntityRenderer computes — no manual tick tracking needed.
 
     // ── Client-side scan wave state ──────────────────────────────────────────
     // scanWaveAge counts up from 0 each tick while scanning; reset to -1 when done.
@@ -280,7 +277,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.tick();
 
         if (level().isClientSide()) {
-            if (firstClientTick < 0) firstClientTick = tickCount; // init animation clock
             // Nozzle trail every 2 ticks
             if (tickCount % 2 == 0) spawnClientNozzleParticles();
             // Scan cone-wave: lock direction at start, advance each tick, never loops
@@ -451,17 +447,17 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     /**
      * Returns the idle-animation phase [0, 1) over the 6-second (120-tick) cycle.
      *
-     * GeckoLib tracks animTime in game ticks (animTime = relTick / 20.0 seconds),
-     * NOT in wall-clock milliseconds.  Using Util.getMillis() drifts from GeckoLib
-     * whenever TPS ≠ 20 (server lag, paused game, etc.), causing the nozzle to
-     * desync for each entity independently.
+     * Reads directly from GeckoLib's AnimatableManager: lastUpdateTime and
+     * firstTickTime are the same values GeoEntityRenderer uses to drive animation,
+     * so this is always in sync with the rendered model — no drift possible.
      *
-     * Fix: count ticks relative to the entity's first client tick, exactly mirroring
-     * GeckoLib's per-entity "ticks since animation start" counter.
+     * Fallback to tickCount % 120 before the entity's first render frame (isFirstTick).
      */
     private double idleAnimPhase() {
-        if (firstClientTick < 0) firstClientTick = tickCount;
-        return ((tickCount - firstClientTick) % 120) / 120.0;
+        AnimatableManager<?> mgr = animCache.getManagerForId(getId());
+        if (mgr.isFirstTick()) return (tickCount % 120) / 120.0;
+        // idle animation_length = 6 s = 120 ticks
+        return ((mgr.getLastUpdateTime() - mgr.getFirstTickTime()) % 120.0) / 120.0;
     }
 
     /**
