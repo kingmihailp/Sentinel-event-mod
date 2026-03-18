@@ -1,6 +1,7 @@
 package com.example.meteormod.entity;
 
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -8,6 +9,7 @@ import net.minecraft.world.entity.projectile.ThrowableProjectile;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 
 public class SentinelBulletEntity extends ThrowableProjectile {
 
@@ -16,15 +18,22 @@ public class SentinelBulletEntity extends ThrowableProjectile {
         this.setNoGravity(true);
     }
 
-    /** No drag — bullet keeps constant speed throughout its lifetime. */
+    // ThrowableProjectile registers ITEM_STACK here; we must call super so that
+    // field is defined — without this the class fails to compile as not-abstract.
     @Override
-    protected float getInertia() {
-        return 1.0f;
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
     }
 
     @Override
     public void tick() {
-        super.tick();
+        // Save velocity before super.tick() applies ThrowableProjectile's 0.99 drag
+        Vec3 vel = getDeltaMovement();
+
+        super.tick(); // moves entity, runs hit detection, scales velocity by inertia
+
+        // Restore pre-tick velocity: bullet travels at constant speed (no drag)
+        setDeltaMovement(vel);
 
         // Blue soul-fire particle trail, visible on the client
         if (level().isClientSide()) {
