@@ -8,6 +8,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -59,8 +60,18 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     // Storing firstClientTick mirrors GeckoLib's per-entity "animation start tick".
     // Multiple entities each get their own reference — no cross-entity phase bleed.
     private int firstClientTick = -1;
-    // Client-side wave state: age 0-39 as ring travels 0→5 blocks from eye
-    private int scanWaveAge = -1;
+
+    // ── Client-side scan wave state ──────────────────────────────────────────
+    // scanWaveAge counts up from 0 each tick while scanning; reset to -1 when done.
+    // Direction is locked at scan start so the wave never bends mid-scan.
+    private int   scanWaveAge   = -1;
+    private float lockedScanYaw   = 0f;
+    private float lockedScanPitch = 0f;
+
+    // ── Combat state (server-side) ────────────────────────────────────────────
+    private int combatTimer   = 0;  // ticks remaining in combat/shooting mode
+    private int shootCooldown = 0;  // ticks until next shot
+    private int shotCount     = 0;  // total shots fired — used to alternate cannons
 
     // ── Scan state ───────────────────────────────────────────────────────────
     private static final int SCAN_DURATION     = 60;
@@ -134,6 +145,82 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         return SoundEvents.BLAZE_DEATH;
     }
 
+    // ── Combat: alert + shooting ──────────────────────────────────────────────
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        boolean wasInCombat = combatTimer > 0;
+        if (!super.hurt(source, amount)) return false;
+        if (!level().isClientSide()) {
+            combatTimer = 300; // 15 seconds of shooting after last hit
+            if (!wasInCombat) {
+                // Play alert sound on first hit — distinctive elder-guardian shriek
+                playSound(SoundEvents.ELDER_GUARDIAN_CURSE, 1.5f, 0.8f);
+                shootCooldown = 5; // fire first shot quickly
+            }
+            // Always set the attacker as the primary target
+            if (source.getEntity() instanceof LivingEntity le) setTarget(le);
+        }
+        return true;
+    }
+
+    /**
+     * Called every server tick when in combat mode.
+     * Alternates shots between the right and left cannon (model geometry).
+     * Cannon tips in absolute model space: right=(-6.25, 1.5, -12.0)px, left=(6.25, 1.5, -12.0)px.
+     */
+    private void tickShooting(ServerLevel serverLevel) {
+        if (combatTimer <= 0) return;
+        combatTimer--;
+
+        if (--shootCooldown > 0) return;
+        shootCooldown = 12; // one burst every 12 ticks (~0.6 s)
+
+        LivingEntity target = getTarget();
+        if (target == null || !target.isAlive()) {
+            target = serverLevel.getNearestPlayer(this, 20.0);
+            if (target != null) setTarget(target);
+        }
+        if (target == null) return;
+
+        // Alternate: even shot = right cannon, odd shot = left cannon
+        boolean rightCannon = (shotCount % 2 == 0);
+        shotCount++;
+
+        Vec3 cannon = getCannonWorldPos(rightCannon);
+
+        // Aim at target's eye level; normalize then scale to bullet speed
+        Vec3 dir = target.getEyePosition().subtract(cannon).normalize().scale(1.4);
+
+        SentinelBulletEntity bullet = new SentinelBulletEntity(ModEntities.SENTINEL_BULLET.get(), serverLevel);
+        bullet.setOwner(this);
+        bullet.setPos(cannon.x, cannon.y, cannon.z);
+        bullet.setDeltaMovement(dir);
+        serverLevel.addFreshEntity(bullet);
+
+        playSound(SoundEvents.BLAZE_SHOOT, 0.7f, 1.1f + random.nextFloat() * 0.2f);
+    }
+
+    /**
+     * Approximate world position of a cannon tip.
+     * Model-space coords (absolute px): right=(-6.25, 1.5, -12.0), left=(6.25, 1.5, -12.0).
+     * Uses body yaw only (no full animation transform needed for server-side spawning).
+     * Height offset includes average idle-animation Y (≈0.65 blocks = ~10.5 px / 16).
+     */
+    private Vec3 getCannonWorldPos(boolean right) {
+        double fx = right ? -6.25 : 6.25; // model-space X (px); –X = entity's right
+        double fz = -12.0;                 // model-space Z (px); –Z = entity's forward
+        double fy = 1.5 / 16.0 + 0.65;    // height above feet: base + avg anim offset
+
+        float  yawRad = (float) Math.toRadians(getYRot());
+        double sinYaw = Math.sin(yawRad), cosYaw = Math.cos(yawRad);
+
+        return new Vec3(
+                getX() + (fz / 16.0) * sinYaw - (fx / 16.0) * cosYaw,
+                getY() + fy,
+                getZ() - (fz / 16.0) * cosYaw - (fx / 16.0) * sinYaw
+        );
+    }
+
     // ── Main tick ─────────────────────────────────────────────────────────────
     @Override
     public void tick() {
@@ -143,11 +230,16 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             if (firstClientTick < 0) firstClientTick = tickCount; // init animation clock
             // Nozzle trail every 2 ticks
             if (tickCount % 2 == 0) spawnClientNozzleParticles();
-            // Scan ring wave: advance one ring per tick while scanning
+            // Scan cone-wave: lock direction at start, advance each tick, never loops
             if (entityData.get(SCANNING)) {
-                if (scanWaveAge < 0) scanWaveAge = 0;
+                if (scanWaveAge < 0) {
+                    scanWaveAge = 0;
+                    // Capture head direction once — wave won't bend even if head moves
+                    lockedScanYaw   = getYHeadRot();
+                    lockedScanPitch = getXRot();
+                }
                 spawnClientScanParticles();
-                if (++scanWaveAge >= 40) scanWaveAge = 0;
+                scanWaveAge++;
             } else {
                 scanWaveAge = -1;
             }
@@ -157,6 +249,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
 
         // Flight first — scan logic may override head yaw afterward
         tickManualFlight();
+        tickShooting(serverLevel);
 
         // ── Scanning state machine ────────────────────────────────────────────
         if (scanTimer > 0) {
@@ -355,50 +448,55 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     }
 
     /**
-     * Yellow-to-red dust_color_transition RING WAVE from the eye.
+     * Yellow-to-red cone wave from the eye toward the locked scan direction.
      *
-     * DustColorTransitionParticle ignores velocity (DustParticleBase zeroes it in
-     * the constructor), so particles cannot be moved with xd/yd/zd.
+     * Why position-based instead of velocity-based:
+     *   DustColorTransitionParticle (DustParticleBase) hard-codes velocity to 0 in
+     *   its constructor — xd/yd/zd from addParticle() are ignored. Particles cannot
+     *   be moved. Instead, each tick a new ring spawns 0.125 blocks further along the
+     *   look direction; stationary particles accumulate into a visible travelling cone.
      *
-     * Solution: each tick advance the ring POSITION along the look direction by
-     * one step (scanWaveAge / 40.0 * 5.0 blocks). Individual particles are
-     * stationary, but a new ring spawns 0.125 blocks further every tick — this
-     * creates a clearly visible expanding ring wave traveling toward the target.
-     * Dust particles live ~20 ticks, so ~20 ring slices are visible at once,
-     * spanning ~2.5 blocks of "tail" with the wave front moving outward.
+     * Cone shape: ring radius = max(0.04, d * tan(14°)) so the wave is a narrow point
+     *   at the eye and fans out to ~1.25 blocks wide at 5 blocks distance.
+     *
+     * Direction locked: lockedScanYaw/Pitch captured at scan start — the cone never
+     *   bends even if the head turns (e.g. failed scan attempt, idle interpolation).
+     *
+     * Continuous: scanWaveAge increments every tick without looping for the duration
+     *   of the scan, so there are no sudden resets or gaps in the wave.
      */
     private void spawnClientScanParticles() {
         // Animation-accurate eye position
         double[] ep = animWorldPos(0.0, 5.75, -5.75);
         double ex = ep[0], ey = ep[1], ez = ep[2];
 
-        // Look direction from head yaw + pitch (synced from server)
-        float  headYaw   = (float) Math.toRadians(getYHeadRot());
-        float  headPitch = (float) Math.toRadians(getXRot());
-        double lx = -Math.sin(headYaw) * Math.cos(headPitch);
-        double ly = -Math.sin(headPitch);
-        double lz =  Math.cos(headYaw) * Math.cos(headPitch);
+        // Use LOCKED direction (set once at scan start) — never changes mid-scan
+        float  yaw   = (float) Math.toRadians(lockedScanYaw);
+        float  pitch = (float) Math.toRadians(lockedScanPitch);
+        double lx = -Math.sin(yaw) * Math.cos(pitch);
+        double ly = -Math.sin(pitch);
+        double lz =  Math.cos(yaw) * Math.cos(pitch);
 
-        // Ring centre travels 0 → 5 blocks from the eye over 40 ticks, then loops
-        double d  = (scanWaveAge / 40.0) * 5.0;
+        // Wave-front distance: 0.125 blocks per tick → reaches ~7.5 blocks at end of 60-tick scan
+        double d  = scanWaveAge * 0.125;
         double cx = ex + lx * d;
         double cy = ey + ly * d;
         double cz = ez + lz * d;
 
-        // Ring basis vectors: right (horizontal perp to look) + world up
-        double rx = Math.cos(headYaw), rz = Math.sin(headYaw);
+        // Cone radius grows linearly with distance (14° half-angle), minimum 0.04 at origin
+        double coneR = Math.max(0.04, d * 0.249); // tan(14°) ≈ 0.249
 
-        final int    COUNT  = 14;
-        final double RING_R = 0.35; // ring radius in blocks
+        // Ring basis: right (horizontal, perpendicular to look yaw) + world up
+        double rx = Math.cos(yaw), rz = Math.sin(yaw);
 
+        final int COUNT = 16;
         for (int i = 0; i < COUNT; i++) {
             double angle = (2.0 * Math.PI / COUNT) * i;
             double ca = Math.cos(angle), sa = Math.sin(angle);
-            // velocity 0,0,0 — dust particles ignore velocity anyway
             level().addParticle(SCAN_DUST,
-                    cx + rx * ca * RING_R,
-                    cy + sa * RING_R,
-                    cz + rz * ca * RING_R,
+                    cx + rx * ca * coneR,
+                    cy + sa * coneR,
+                    cz + rz * ca * coneR,
                     0.0, 0.0, 0.0);
         }
     }

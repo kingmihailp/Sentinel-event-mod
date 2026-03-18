@@ -30,4 +30,14 @@ public class ModEntities {
                             .clientTrackingRange(64)
                             .build("meteormod:sentinel")
             );
+
+    // ── Sentinel cannon bullet ───────────────────────────────────────────────
+    public static final DeferredHolder<EntityType<?>, EntityType<SentinelBulletEntity>> SENTINEL_BULLET =
+            ENTITIES.register("sentinel_bullet", () ->
+                    EntityType.Builder.<SentinelBulletEntity>of(SentinelBulletEntity::new, MobCategory.MISC)
+                            .sized(0.25f, 0.25f)
+                            .clientTrackingRange(64)
+                            .updateInterval(1)
+                            .build("meteormod:sentinel_bullet")
+            );
 }

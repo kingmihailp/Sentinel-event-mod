@@ -2,6 +2,7 @@ package com.example.meteormod.event;
 
 import com.example.meteormod.MeteorMod;
 import com.example.meteormod.client.renderer.MeteorRenderer;
+import com.example.meteormod.client.renderer.SentinelBulletRenderer;
 import com.example.meteormod.client.renderer.SentinelRenderer;
 import com.example.meteormod.entity.ModEntities;
 import net.neoforged.api.distmarker.Dist;
@@ -16,5 +17,6 @@ public class ClientEventHandler {
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.METEOR.get(), MeteorRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL.get(), SentinelRenderer::new);
+        event.registerEntityRenderer(ModEntities.SENTINEL_BULLET.get(), SentinelBulletRenderer::new);
     }
 }
