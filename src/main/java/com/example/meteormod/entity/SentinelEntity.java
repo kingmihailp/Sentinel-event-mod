@@ -6,6 +6,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -46,6 +47,13 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation ANIM_IDLE = RawAnimation.begin().thenLoop("idle");
 
     private final AnimatableInstanceCache animCache = GeckoLibUtil.createInstanceCache(this);
+
+    // ── Captain flag ─────────────────────────────────────────────────────────
+    // Set to true when spawned by a meteor. Killing a captain triggers a sentinel raid.
+    private boolean captain = false;
+
+    public void  setCaptain(boolean value) { captain = value; }
+    public boolean isCaptain()             { return captain;  }
 
     // ── Scan particles: yellow → red dust transition ─────────────────────────
     private static final DustColorTransitionOptions SCAN_DUST =
@@ -173,6 +181,11 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE,
                     getX(), getEyeY(), getZ(),
                     30, 0.45, 0.45, 0.45, 0.04);
+
+            // Captain killed by a player → start a sentinel raid for that player
+            if (captain && source.getEntity() instanceof ServerPlayer killer) {
+                com.example.meteormod.event.SentinelRaidManager.onCaptainKilled(killer, serverLevel);
+            }
         }
     }
 
@@ -615,6 +628,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.addAdditionalSaveData(tag);
         tag.putInt("ScanTimer",    scanTimer);
         tag.putInt("ScanCooldown", scanCooldown);
+        tag.putBoolean("Captain",  captain);
     }
 
     @Override
@@ -622,5 +636,6 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         super.readAdditionalSaveData(tag);
         scanTimer    = tag.getInt("ScanTimer");
         scanCooldown = tag.getInt("ScanCooldown");
+        captain      = tag.getBoolean("Captain");
     }
 }

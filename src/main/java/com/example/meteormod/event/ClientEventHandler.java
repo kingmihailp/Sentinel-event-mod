@@ -1,14 +1,17 @@
 package com.example.meteormod.event;
 
 import com.example.meteormod.MeteorMod;
+import com.example.meteormod.client.RaidHudOverlay;
 import com.example.meteormod.client.renderer.MeteorRenderer;
 import com.example.meteormod.client.renderer.SentinelBulletRenderer;
 import com.example.meteormod.client.renderer.SentinelRenderer;
 import com.example.meteormod.entity.ModEntities;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 
 @EventBusSubscriber(modid = MeteorMod.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ClientEventHandler {
@@ -18,5 +21,13 @@ public class ClientEventHandler {
         event.registerEntityRenderer(ModEntities.METEOR.get(), MeteorRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL.get(), SentinelRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL_BULLET.get(), SentinelBulletRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
+        event.registerAboveAll(
+                ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "raid_hud"),
+                RaidHudOverlay::render
+        );
     }
 }

@@ -124,17 +124,14 @@ public class MeteorEntity extends Entity {
                 Level.ExplosionInteraction.BLOCK
         );
 
-        // Spawn 1–3 Sentinels near impact point
+        // Spawn exactly 1 captain Sentinel at the impact point.
+        // Killing this captain triggers a sentinel raid for the player who lands the kill.
         if (level instanceof ServerLevel serverLevel) {
-            int count = 1 + serverLevel.random.nextInt(3);
-            for (int i = 0; i < count; i++) {
-                SentinelEntity sentinel = new SentinelEntity(ModEntities.SENTINEL.get(), level);
-                double offsetX = (serverLevel.random.nextDouble() - 0.5) * 4.0;
-                double offsetZ = (serverLevel.random.nextDouble() - 0.5) * 4.0;
-                sentinel.setPos(x + offsetX, y + 1.0, z + offsetZ);
-                sentinel.setHealth(sentinel.getMaxHealth());
-                serverLevel.addFreshEntity(sentinel);
-            }
+            SentinelEntity sentinel = new SentinelEntity(ModEntities.SENTINEL.get(), level);
+            sentinel.setPos(x, y + 1.0, z);
+            sentinel.setHealth(sentinel.getMaxHealth());
+            sentinel.setCaptain(true);
+            serverLevel.addFreshEntity(sentinel);
         }
     }
 }
