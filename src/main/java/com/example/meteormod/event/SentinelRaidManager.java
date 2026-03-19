@@ -62,7 +62,8 @@ public class SentinelRaidManager {
      */
     public static void onCaptainKilled(Player player, ServerLevel level) {
         UUID pid = player.getUUID();
-        if (raids.containsKey(pid)) return; // already in raid
+        // Block if raid is active in memory OR saved on disk (player was offline)
+        if (raids.containsKey(pid) || getSavedData(level).has(pid)) return;
 
         SentinelRaid raid = new SentinelRaid(pid);
         raids.put(pid, raid);
@@ -196,6 +197,7 @@ public class SentinelRaidManager {
             s.setPos(sx, sy, sz);
             s.setHealth(s.getMaxHealth());
             level.addFreshEntity(s);
+            s.startCombatAgainst(player); // immediately target the player
             raid.activeSentinels.add(s.getUUID());
         }
 

@@ -605,9 +605,21 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
         }
     }
 
-    // ── Public accessor ───────────────────────────────────────────────────────
+    // ── Public accessors ─────────────────────────────────────────────────────
     public boolean isScanning() {
         return entityData.get(SCANNING);
+    }
+
+    /**
+     * Immediately put this sentinel into combat mode targeting {@code target}.
+     * Used by {@link com.example.meteormod.event.SentinelRaidManager} when
+     * spawning raid waves so every sentinel attacks at once without waiting to
+     * be hit first.
+     */
+    public void startCombatAgainst(LivingEntity target) {
+        setTarget(target);
+        combatTimer   = 300; // 15 s of active combat
+        shootCooldown = 5;   // fire first shot almost immediately
     }
 
     // ── GeckoLib — always idle ────────────────────────────────────────────────
