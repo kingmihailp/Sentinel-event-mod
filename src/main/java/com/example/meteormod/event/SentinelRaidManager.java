@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -26,7 +27,12 @@ import java.util.*;
  *  3. Wave cleared (all sentinels dead)  → 3-second delay → next wave
  *  4. After wave 6 cleared              → raid ends, HUD hides
  *
- * The HUD shows 6 diamonds; defeated waves fade out (server sends completedWaves count).
+ * Persistence:
+ *  - On player disconnect: completedWaves + spawnTimer saved to RaidSavedData
+ *  - On player reconnect : state restored, HUD re-sent
+ *  - On server restart   : same — world data survives between sessions
+ *  - activeSentinels is NOT saved; if a wave was active it restarts after
+ *    BETWEEN_WAVE_DELAY ticks.
  */
 @EventBusSubscriber(modid = MeteorMod.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
 public class SentinelRaidManager {
@@ -41,10 +47,11 @@ public class SentinelRaidManager {
             {1, 1},  // wave 6
     };
 
-    private static final int INTRO_DELAY       = 40;  // 2 s before first wave
-    private static final int BETWEEN_WAVE_DELAY = 60; // 3 s between waves
+    public  static final int TOTAL_WAVES        = 6;
+    private static final int INTRO_DELAY        = 40;  // 2 s before first wave
+    static         final int BETWEEN_WAVE_DELAY = 60;  // 3 s between waves
 
-    // ── State (per player, server-side only) ──────────────────────────────────
+    // ── In-memory state (online players only) ────────────────────────────────
     private static final Map<UUID, SentinelRaid> raids = new HashMap<>();
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -59,12 +66,57 @@ public class SentinelRaidManager {
 
         SentinelRaid raid = new SentinelRaid(pid);
         raids.put(pid, raid);
+        syncToSavedData(level, pid, raid);
         sendHud(level, pid, 0, true);
     }
 
-    /** Clears all raid state (e.g. on world reload). */
+    /** Clears all in-memory raid state (e.g. on world reload). */
     public static void reset() {
         raids.clear();
+    }
+
+    // ── Player login / logout ─────────────────────────────────────────────────
+
+    /**
+     * On login: restore any saved raid from disk and re-send the HUD.
+     */
+    @SubscribeEvent
+    public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        ServerLevel overworld = player.getServer().getLevel(Level.OVERWORLD);
+        if (overworld == null) return;
+
+        UUID pid = player.getUUID();
+        if (raids.containsKey(pid)) return; // already running (shouldn't happen)
+
+        int[] state = getSavedData(overworld).take(pid);
+        if (state == null) return;
+
+        SentinelRaid raid    = new SentinelRaid(pid);
+        raid.completedWaves  = state[0];
+        raid.spawnTimer      = state[1];
+        raid.waveActive      = false; // sentinels are gone; wave will re-spawn
+        raids.put(pid, raid);
+
+        sendHud(overworld, pid, raid.completedWaves, true);
+    }
+
+    /**
+     * On logout: persist raid state to disk and remove from in-memory map.
+     */
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        ServerLevel overworld = player.getServer().getLevel(Level.OVERWORLD);
+        if (overworld == null) return;
+
+        UUID pid = player.getUUID();
+        SentinelRaid raid = raids.remove(pid);
+        if (raid == null) return;
+
+        // If a wave was in progress, restart it from scratch after the delay.
+        int timer = raid.waveActive ? BETWEEN_WAVE_DELAY : raid.spawnTimer;
+        getSavedData(overworld).put(pid, raid.completedWaves, timer);
     }
 
     // ── Tick handler ──────────────────────────────────────────────────────────
@@ -80,21 +132,18 @@ public class SentinelRaidManager {
         Iterator<Map.Entry<UUID, SentinelRaid>> it = raids.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<UUID, SentinelRaid> entry = it.next();
-            UUID pid   = entry.getKey();
+            UUID        pid  = entry.getKey();
             SentinelRaid raid = entry.getValue();
 
-            // Drop raid if player disconnected
+            // Player offline — will be handled by onPlayerLogout; skip here.
             ServerPlayer player = level.getServer().getPlayerList().getPlayer(pid);
-            if (player == null) {
-                it.remove();
-                continue;
-            }
+            if (player == null) continue;
 
             if (raid.waveActive) {
                 // ── Wave in progress: check for remaining sentinels ──────────
                 raid.activeSentinels.removeIf(uuid -> {
                     Entity e = level.getEntity(uuid);
-                    if (e == null) return true;                        // removed from world
+                    if (e == null) return true;
                     if (e instanceof LivingEntity le) return le.getHealth() <= 0;
                     return e.isRemoved();
                 });
@@ -104,13 +153,15 @@ public class SentinelRaidManager {
                     raid.waveActive = false;
                     raid.completedWaves++;
 
-                    if (raid.completedWaves >= WAVE_COUNTS.length) {
+                    if (raid.completedWaves >= TOTAL_WAVES) {
                         // All 6 waves done — victory
                         sendHud(level, pid, raid.completedWaves, false);
+                        getSavedData(level).take(pid); // remove persisted data
                         it.remove();
                     } else {
-                        sendHud(level, pid, raid.completedWaves, true);
                         raid.spawnTimer = BETWEEN_WAVE_DELAY;
+                        sendHud(level, pid, raid.completedWaves, true);
+                        syncToSavedData(level, pid, raid);
                     }
                 }
 
@@ -120,6 +171,7 @@ public class SentinelRaidManager {
                     raid.spawnTimer--;
                 } else {
                     spawnWave(raid, player, level);
+                    syncToSavedData(level, pid, raid);
                 }
             }
         }
@@ -138,7 +190,7 @@ public class SentinelRaidManager {
             double radius = 15.0 + level.random.nextDouble() * 10.0;
             double sx = player.getX() + Math.cos(angle) * radius;
             double sz = player.getZ() + Math.sin(angle) * radius;
-            double sy = player.getY() + 5.0; // above player, sentinels fly
+            double sy = player.getY() + 5.0;
 
             SentinelEntity s = new SentinelEntity(ModEntities.SENTINEL.get(), level);
             s.setPos(sx, sy, sz);
@@ -148,6 +200,21 @@ public class SentinelRaidManager {
         }
 
         raid.waveActive = true;
+    }
+
+    // ── Persistence helpers ───────────────────────────────────────────────────
+
+    private static RaidSavedData getSavedData(ServerLevel level) {
+        return level.getServer()
+                    .getLevel(Level.OVERWORLD)
+                    .getDataStorage()
+                    .computeIfAbsent(RaidSavedData.FACTORY, RaidSavedData.NAME);
+    }
+
+    /** Mirror current in-memory raid state to SavedData (marks dirty → auto-saved). */
+    private static void syncToSavedData(ServerLevel level, UUID pid, SentinelRaid raid) {
+        int timer = raid.waveActive ? BETWEEN_WAVE_DELAY : raid.spawnTimer;
+        getSavedData(level).put(pid, raid.completedWaves, timer);
     }
 
     // ── Packet helper ─────────────────────────────────────────────────────────
@@ -163,9 +230,9 @@ public class SentinelRaidManager {
 
     private static final class SentinelRaid {
         final UUID playerId;
-        int  completedWaves = 0;    // waves defeated so far (0–6)
-        boolean waveActive  = false; // true while sentinels are alive
-        int  spawnTimer     = INTRO_DELAY; // ticks until next wave
+        int     completedWaves = 0;
+        boolean waveActive     = false;
+        int     spawnTimer     = INTRO_DELAY;
         final Set<UUID> activeSentinels = new HashSet<>();
 
         SentinelRaid(UUID playerId) { this.playerId = playerId; }
