@@ -1,10 +1,14 @@
 package com.example.meteormod.entity;
 
+import com.example.meteormod.MeteorMod;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -27,6 +31,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.particles.DustColorTransitionOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -123,6 +128,13 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
                 .add(Attributes.ATTACK_DAMAGE,  4.0)
                 .add(Attributes.FOLLOW_RANGE,  30.0)
                 .add(Attributes.ARMOR,          2.0);
+    }
+
+    // ── Loot table ────────────────────────────────────────────────────────────
+    @Override
+    public ResourceKey<LootTable> getDefaultLootTable() {
+        return ResourceKey.create(Registries.LOOT_TABLE,
+                ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "entities/sentinel"));
     }
 
     // ── Goals ────────────────────────────────────────────────────────────────

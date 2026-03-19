@@ -16,9 +16,8 @@ public class ModCreativeTabs {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SENTINEL_TAB =
             TABS.register("sentinel_tab", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.meteormod.sentinel_tab"))
-                    // walker_core is the most iconic sentinel item; replace with a
-                    // spawn egg if one is ever added.
-                    .icon(() -> new ItemStack(ModItems.WALKER_CORE.get()))
+                    // SentinelIconItem renders a live 3-D sentinel via BEWLR
+                    .icon(() -> new ItemStack(ModItems.SENTINEL_TAB_ICON.get()))
                     .displayItems((params, output) -> {
                         output.accept(ModItems.SMALL_SENTINEL_SCRAP.get());
                         output.accept(ModItems.MEDIUM_SENTINEL_SCRAP.get());

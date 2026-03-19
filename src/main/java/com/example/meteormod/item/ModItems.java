@@ -30,4 +30,12 @@ public class ModItems {
     public static final DeferredItem<Item> WALKER_CORE =
             ITEMS.registerSimpleItem("walker_core",
                     new Item.Properties().rarity(Rarity.EPIC));
+
+    /**
+     * Internal item used only as the creative-tab icon.
+     * Renders a live 3-D sentinel that follows the mouse cursor.
+     * Never shown in the tab's item list.
+     */
+    public static final DeferredItem<Item> SENTINEL_TAB_ICON =
+            ITEMS.register("sentinel_tab_icon", SentinelIconItem::new);
 }
