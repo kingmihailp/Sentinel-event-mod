@@ -29,6 +29,8 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.ExplosionDamageCalculator;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.LootTable;
@@ -131,8 +133,12 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     }
 
     // ── Loot table ────────────────────────────────────────────────────────────
+    // Mob.getLootTable() is final; it calls getDefaultLootTable() when the mob's
+    // own lootTable field is null (the normal case for non-NBT-overridden mobs).
+    // Overriding getDefaultLootTable() here guarantees the correct key regardless
+    // of how EntityType.getDefaultLootTable() resolves the registry lookup.
     @Override
-    public ResourceKey<LootTable> getDefaultLootTable() {
+    protected ResourceKey<LootTable> getDefaultLootTable() {
         return ResourceKey.create(Registries.LOOT_TABLE,
                 ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "entities/sentinel"));
     }
@@ -188,8 +194,21 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
     public void die(DamageSource source) {
         super.die(source);
         if (!level().isClientSide() && level() instanceof ServerLevel serverLevel) {
-            serverLevel.explode(this, getX(), getEyeY(), getZ(),
-                    2.5f, false, Level.ExplosionInteraction.NONE);
+            // Visual-only explosion: custom calculator disables entity and item damage
+            // so dropped loot is never destroyed by the blast.
+            serverLevel.explode(this,
+                    Explosion.getDefaultDamageSource(serverLevel, this),
+                    new ExplosionDamageCalculator() {
+                        @Override
+                        public boolean shouldDamageEntity(Explosion explosion, Entity entity) {
+                            return false; // no damage to entities or dropped items
+                        }
+                    },
+                    getX(), getEyeY(), getZ(),
+                    2.5f, false, Level.ExplosionInteraction.NONE,
+                    ParticleTypes.EXPLOSION,
+                    ParticleTypes.EXPLOSION_EMITTER,
+                    SoundEvents.GENERIC_EXPLODE);
             serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE,
                     getX(), getEyeY(), getZ(),
                     30, 0.45, 0.45, 0.45, 0.04);

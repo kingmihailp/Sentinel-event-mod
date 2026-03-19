@@ -3,7 +3,6 @@ package com.example.meteormod.client;
 import com.example.meteormod.entity.ModEntities;
 import com.example.meteormod.entity.SentinelEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -18,10 +17,11 @@ import net.minecraft.world.item.ItemStack;
  * The entity's head yaw / pitch follow the current mouse cursor position so
  * the sentinel "looks at" the player just like Alex's Mobs does.
  *
- * Scale and translation values:
- *   translate(0.5, 0.05, 0.5) → centred horizontally, feet near icon bottom
- *   scale(0.5)                → sentinel (1.8 bl) fits in ~0.9 bl icon height
- *   rotateY(180°)             → front of entity faces the viewer
+ * WHY no extra Y rotation in the PoseStack:
+ *   LivingEntityRenderer.render() already applies (180° − yBodyRot) to the
+ *   PoseStack before drawing the model. At yBodyRot = 0 that is exactly 180°,
+ *   which makes the entity face the viewer. Adding another 180° here would
+ *   produce a total of 360° (= 0°) — showing the entity's back instead.
  */
 public class SentinelIconBEWLR extends BlockEntityWithoutLevelRenderer {
 
@@ -58,25 +58,24 @@ public class SentinelIconBEWLR extends BlockEntityWithoutLevelRenderer {
         float mx = (float)(mc.mouseHandler.xpos() / screenW) - 0.5f;
         float my = (float)(mc.mouseHandler.ypos() / screenH) - 0.5f;
 
-        // ±60° left/right, ±30° up/down (clamped to feel natural)
-        float yaw   =  mx * 120.0f;
-        float pitch = -my *  60.0f;
+        // LivingEntityRenderer applies (180 − yBodyRot), so yBodyRot = 0 → faces viewer.
+        // Negative mx makes the sentinel look right when the cursor moves right.
+        float yaw   = -mx * 120.0f;   // ±60° left/right
+        float pitch = -my *  60.0f;   // ±30° up/down
 
         dummy.setYRot(yaw);
-        dummy.yBodyRot   = yaw;
-        dummy.yHeadRot   = yaw;
-        dummy.yHeadRotO  = yaw;
+        dummy.yBodyRot  = yaw;
+        dummy.yHeadRot  = yaw;
+        dummy.yHeadRotO = yaw;
         dummy.setXRot(pitch);
 
         // ── Render ──────────────────────────────────────────────────────────
         pose.pushPose();
 
-        // Centre in the icon slot; feet near the bottom edge
+        // Centre in the icon slot; feet near the bottom edge.
+        // No extra Y rotation — LivingEntityRenderer already applies 180° internally.
         pose.translate(0.5, 0.05, 0.5);
-        // Scale so the 1.8-block entity fills ~90 % of the icon height
-        pose.scale(0.5f, 0.5f, 0.5f);
-        // Rotate 180° so the model's front faces the viewer
-        pose.mulPose(Axis.YP.rotationDegrees(180f));
+        pose.scale(0.5f, 0.5f, 0.5f);  // sentinel 1.8 bl → ~0.9 bl, fits the icon
 
         mc.getEntityRenderDispatcher().setRenderShadow(false);
         mc.getEntityRenderDispatcher().render(
