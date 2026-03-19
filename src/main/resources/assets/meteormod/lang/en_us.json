@@ -1,0 +1,8 @@
+{
+  "itemGroup.meteormod.sentinel_tab": "Sentinel Mod",
+
+  "item.meteormod.small_sentinel_scrap":  "Small Sentinel Scrap",
+  "item.meteormod.medium_sentinel_scrap": "Sentinel Armor Piece",
+  "item.meteormod.large_sentinel_scrap":  "Sentinel Processor",
+  "item.meteormod.walker_core":           "Walker Core"
+}

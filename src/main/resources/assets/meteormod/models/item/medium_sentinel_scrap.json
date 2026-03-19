@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "meteormod:item/medium_sentinel_scrap"
+  }
+}

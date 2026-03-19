@@ -1,0 +1,8 @@
+{
+  "itemGroup.meteormod.sentinel_tab": "Sentinel Mod",
+
+  "item.meteormod.small_sentinel_scrap":  "Небольшая кучка лома стража",
+  "item.meteormod.medium_sentinel_scrap": "Кусок обшивки стража",
+  "item.meteormod.large_sentinel_scrap":  "Процессор стража",
+  "item.meteormod.walker_core":           "Мозг шагающего стража"
+}
