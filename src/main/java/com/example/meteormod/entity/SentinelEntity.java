@@ -252,7 +252,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             combatTimer = 300;
 
             if (--shootCooldown <= 0) {
-                shootCooldown = 12; // one burst every 12 ticks (~0.6 s)
+                shootCooldown = 30; // one burst every 30 ticks (~1.5 s)
 
                 // Alternate: even shot = right cannon, odd shot = left cannon
                 boolean rightCannon = (shotCount % 2 == 0);
