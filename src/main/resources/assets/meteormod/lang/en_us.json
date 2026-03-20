@@ -4,5 +4,9 @@
   "item.meteormod.small_sentinel_scrap":  "Small Sentinel Scrap",
   "item.meteormod.medium_sentinel_scrap": "Sentinel Armor Piece",
   "item.meteormod.large_sentinel_scrap":  "Sentinel Processor",
-  "item.meteormod.walker_core":           "Walker Core"
+  "item.meteormod.walker_core":           "Walker Core",
+
+  "item.meteormod.sentinelmetal_nugget":  "Sentinel Metal Nugget",
+  "item.meteormod.sentinelmetal_ingot":   "Sentinel Metal Ingot",
+  "block.meteormod.sentinelmetal_block":  "Sentinel Metal Block"
 }

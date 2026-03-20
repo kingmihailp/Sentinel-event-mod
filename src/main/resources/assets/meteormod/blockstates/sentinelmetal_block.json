@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "meteormod:block/sentinelmetal_block"
+    }
+  }
+}

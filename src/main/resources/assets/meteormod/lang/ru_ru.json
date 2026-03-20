@@ -4,5 +4,9 @@
   "item.meteormod.small_sentinel_scrap":  "Небольшая кучка лома стража",
   "item.meteormod.medium_sentinel_scrap": "Кусок обшивки стража",
   "item.meteormod.large_sentinel_scrap":  "Процессор стража",
-  "item.meteormod.walker_core":           "Мозг шагающего стража"
+  "item.meteormod.walker_core":           "Мозг шагающего стража",
+
+  "item.meteormod.sentinelmetal_nugget":  "Самородок страж-металла",
+  "item.meteormod.sentinelmetal_ingot":   "Слиток страж-металла",
+  "block.meteormod.sentinelmetal_block":  "Блок страж-металла"
 }

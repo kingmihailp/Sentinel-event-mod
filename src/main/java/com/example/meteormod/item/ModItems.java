@@ -1,6 +1,7 @@
 package com.example.meteormod.item;
 
 import com.example.meteormod.MeteorMod;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -30,6 +31,22 @@ public class ModItems {
     public static final DeferredItem<Item> WALKER_CORE =
             ITEMS.registerSimpleItem("walker_core",
                     new Item.Properties().rarity(Rarity.EPIC));
+
+    /** Crafting ingredient — common */
+    public static final DeferredItem<Item> SENTINEL_METAL_NUGGET =
+            ITEMS.registerSimpleItem("sentinelmetal_nugget",
+                    new Item.Properties().rarity(Rarity.COMMON));
+
+    /** Crafting ingredient — common */
+    public static final DeferredItem<Item> SENTINEL_METAL_INGOT =
+            ITEMS.registerSimpleItem("sentinelmetal_ingot",
+                    new Item.Properties().rarity(Rarity.COMMON));
+
+    /** BlockItem for the sentinel metal block */
+    public static final DeferredItem<BlockItem> SENTINEL_METAL_BLOCK_ITEM =
+            ITEMS.registerItem("sentinelmetal_block",
+                    props -> new BlockItem(ModBlocks.SENTINEL_METAL_BLOCK.get(), props),
+                    new Item.Properties().rarity(Rarity.COMMON));
 
     /**
      * Internal item used only as the creative-tab icon.
