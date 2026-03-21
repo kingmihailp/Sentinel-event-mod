@@ -230,6 +230,31 @@ public class SentinelRaidManager {
         getSavedData(level).put(pid, raid.completedWaves, timer);
     }
 
+    // ── Aggro sharing ─────────────────────────────────────────────────────────
+
+    /**
+     * Called when {@code hitSentinel} is hurt during an active raid.
+     * Every other living sentinel in the same raid immediately enters combat
+     * targeting {@code attacker}.
+     */
+    public static void alertRaidSentinels(ServerLevel level,
+                                          com.example.meteormod.entity.SentinelEntity hitSentinel,
+                                          LivingEntity attacker) {
+        UUID hitId = hitSentinel.getUUID();
+        for (SentinelRaid raid : raids.values()) {
+            if (!raid.activeSentinels.contains(hitId)) continue;
+            for (UUID uuid : raid.activeSentinels) {
+                if (uuid.equals(hitId)) continue;
+                Entity e = level.getEntity(uuid);
+                if (e instanceof com.example.meteormod.entity.SentinelEntity other
+                        && other.isAlive()) {
+                    other.startCombatAgainst(attacker);
+                }
+            }
+            break; // sentinel can only be in one raid
+        }
+    }
+
     // ── Packet helper ─────────────────────────────────────────────────────────
 
     private static void sendHud(ServerLevel level, UUID pid, int completedWaves, boolean active, int enemiesLeft) {

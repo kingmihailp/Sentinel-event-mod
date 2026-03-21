@@ -180,7 +180,12 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
                 shootCooldown = 5; // fire first shot quickly
             }
             // Always set the attacker as the primary target
-            if (source.getEntity() instanceof LivingEntity le) setTarget(le);
+            if (source.getEntity() instanceof LivingEntity le) {
+                setTarget(le);
+                // Alert all other raid sentinels so they enter combat simultaneously
+                com.example.meteormod.event.SentinelRaidManager.alertRaidSentinels(
+                        (ServerLevel) level(), this, le);
+            }
         }
         return true;
     }
