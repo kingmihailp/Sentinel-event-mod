@@ -10,7 +10,7 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.block.Blocks;
+import com.example.meteormod.item.ModBlocks;
 
 public class MeteorRenderer extends EntityRenderer<MeteorEntity> {
 
@@ -38,9 +38,8 @@ public class MeteorRenderer extends EntityRenderer<MeteorEntity> {
         poseStack.mulPose(Axis.XP.rotationDegrees(angle * 0.7f));
         poseStack.translate(-0.5, -0.5, -0.5);
 
-        // Render as an iron block
         blockRenderer.renderSingleBlock(
-                Blocks.IRON_BLOCK.defaultBlockState(),
+                ModBlocks.SUSPICIOUS_PACKAGE.get().defaultBlockState(),
                 poseStack,
                 buffer,
                 packedLight,
@@ -54,6 +53,6 @@ public class MeteorRenderer extends EntityRenderer<MeteorEntity> {
 
     @Override
     public ResourceLocation getTextureLocation(MeteorEntity entity) {
-        return ResourceLocation.fromNamespaceAndPath("minecraft", "textures/block/iron_block.png");
+        return ResourceLocation.fromNamespaceAndPath(com.example.meteormod.MeteorMod.MOD_ID, "textures/block/suspicious_package.png");
     }
 }

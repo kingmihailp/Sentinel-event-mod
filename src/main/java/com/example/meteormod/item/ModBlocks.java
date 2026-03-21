@@ -18,4 +18,12 @@ public class ModBlocks {
                             .requiresCorrectToolForDrops()
                             .strength(5.0f, 6.0f)
                             .sound(SoundType.COPPER));
+
+    /** The meteor visual block — indestructible, blast-proof, no item, no creative tab. */
+    public static final DeferredBlock<Block> SUSPICIOUS_PACKAGE =
+            BLOCKS.registerSimpleBlock("suspicious_package",
+                    BlockBehaviour.Properties.of()
+                            .strength(-1.0F, 3600000.0F)
+                            .noLootTable()
+                            .sound(SoundType.WOOD));
 }

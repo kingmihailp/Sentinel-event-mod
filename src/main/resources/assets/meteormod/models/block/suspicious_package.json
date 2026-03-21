@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "meteormod:block/suspicious_package",
+    "up":    "meteormod:block/suspicious_package",
+    "down":  "meteormod:block/suspicious_package",
+    "south": "meteormod:block/suspicious_package",
+    "east":  "meteormod:block/suspicious_package",
+    "west":  "meteormod:block/suspicious_package",
+    "north": "meteormod:block/suspicious_package_side"
+  }
+}
