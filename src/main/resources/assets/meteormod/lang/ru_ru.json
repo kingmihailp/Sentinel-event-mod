@@ -9,5 +9,7 @@
   "item.meteormod.sentinelmetal_nugget":  "Самородок страж-металла",
   "item.meteormod.sentinelmetal_ingot":   "Слиток страж-металла",
   "block.meteormod.sentinelmetal_block":  "Блок страж-металла",
-  "block.meteormod.suspicious_package":   "Подозрительная посылка"
+  "block.meteormod.suspicious_package":   "Подозрительная посылка",
+
+  "item.meteormod.sentinel_cannon":       "Страж-пушка"
 }

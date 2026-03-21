@@ -26,6 +26,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.SENTINEL_METAL_NUGGET.get());
                         output.accept(ModItems.SENTINEL_METAL_INGOT.get());
                         output.accept(ModItems.SENTINEL_METAL_BLOCK_ITEM.get());
+                        output.accept(ModItems.SENTINEL_CANNON.get());
                     })
                     .build());
 }

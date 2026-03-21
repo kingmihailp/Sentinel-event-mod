@@ -9,5 +9,7 @@
   "item.meteormod.sentinelmetal_nugget":  "Sentinel Metal Nugget",
   "item.meteormod.sentinelmetal_ingot":   "Sentinel Metal Ingot",
   "block.meteormod.sentinelmetal_block":  "Sentinel Metal Block",
-  "block.meteormod.suspicious_package":   "Suspicious Package"
+  "block.meteormod.suspicious_package":   "Suspicious Package",
+
+  "item.meteormod.sentinel_cannon":       "Sentinel Cannon"
 }

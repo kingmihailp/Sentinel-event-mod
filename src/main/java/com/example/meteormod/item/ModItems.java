@@ -58,6 +58,11 @@ public class ModItems {
                     props -> new BlockItem(ModBlocks.SUSPICIOUS_PACKAGE.get(), props),
                     new Item.Properties().rarity(Rarity.EPIC));
 
+    /** Sentinel Cannon — placeholder item, 3D model to be replaced. */
+    public static final DeferredItem<Item> SENTINEL_CANNON =
+            ITEMS.registerSimpleItem("sentinel_cannon",
+                    new Item.Properties().rarity(Rarity.EPIC).stacksTo(1));
+
     /**
      * Internal item used only as the creative-tab icon.
      * Renders a live 3-D sentinel that follows the mouse cursor.
