@@ -256,7 +256,7 @@ public class SentinelEntity extends PathfinderMob implements GeoEntity {
             // Player visible: keep combat active indefinitely, shoot
             combatTimer = 300;
 
-            if (--shootCooldown <= 0) {
+            if (--shootCooldown <= 0 && !this.hasEffect(com.example.meteormod.effect.ModEffects.ELECTRIFIED)) {
                 shootCooldown = 30; // one burst every 30 ticks (~1.5 s)
 
                 // Alternate: even shot = right cannon, odd shot = left cannon

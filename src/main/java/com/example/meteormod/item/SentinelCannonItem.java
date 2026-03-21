@@ -37,6 +37,7 @@ public class SentinelCannonItem extends Item {
         }
 
         player.getCooldowns().addCooldown(this, COOLDOWN_TICKS);
-        return InteractionResultHolder.success(stack);
+        // consume() → InteractionResult.shouldSwing() == false → no arm-swing animation
+        return InteractionResultHolder.consume(stack);
     }
 }
