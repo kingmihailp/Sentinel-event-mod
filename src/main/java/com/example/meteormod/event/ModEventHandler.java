@@ -37,7 +37,7 @@ public class ModEventHandler {
                 (payload, ctx) -> ctx.enqueueWork(
                         () -> {
                             if (FMLEnvironment.dist == Dist.CLIENT) {
-                                RaidHudOverlay.update(payload.active(), payload.completedWaves());
+                                RaidHudOverlay.update(payload.active(), payload.completedWaves(), payload.enemiesLeft());
                             }
                         }
                 )

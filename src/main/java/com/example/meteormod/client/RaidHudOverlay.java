@@ -78,6 +78,7 @@ public final class RaidHudOverlay {
     // ── State ─────────────────────────────────────────────────────────────────
     private static volatile boolean active         = false;
     private static volatile int     completedWaves = 0;
+    private static volatile int     enemiesLeft    = 0;
 
     // Code scroller state
     private static long lastCodeTick = 0;
@@ -86,9 +87,10 @@ public final class RaidHudOverlay {
     private RaidHudOverlay() {}
 
     /** Called from network payload handler (enqueued on the client thread). */
-    public static void update(boolean newActive, int newCompletedWaves) {
+    public static void update(boolean newActive, int newCompletedWaves, int newEnemiesLeft) {
         active         = newActive;
         completedWaves = newCompletedWaves;
+        enemiesLeft    = newEnemiesLeft;
     }
 
     /** Registered as LayeredDraw.Layer — called every frame. */
@@ -162,9 +164,8 @@ public final class RaidHudOverlay {
 
         g.drawString(font, galacticLabel, textX, textY, COLOR_ACTIVE, false);
 
-        // Wave number (Arabic numeral) right after the label
-        int currentWave = Math.min(completedWaves + 1, TOTAL_WAVES);
-        g.drawString(font, String.valueOf(currentWave), textX + labelW, textY, COLOR_ACTIVE, false);
+        // Remaining enemies count right after the label
+        g.drawString(font, String.valueOf(enemiesLeft), textX + labelW, textY, COLOR_ACTIVE, false);
     }
 
     /** Fills a diamond (rhombus) centred at (cx, cy) with the given half-radius. */

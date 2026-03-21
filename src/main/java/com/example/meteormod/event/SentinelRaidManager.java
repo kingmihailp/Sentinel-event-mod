@@ -68,7 +68,7 @@ public class SentinelRaidManager {
         SentinelRaid raid = new SentinelRaid(pid);
         raids.put(pid, raid);
         syncToSavedData(level, pid, raid);
-        sendHud(level, pid, 0, true);
+        sendHud(level, pid, 0, true, 0);
     }
 
     /** Clears all in-memory raid state (e.g. on world reload). */
@@ -99,7 +99,7 @@ public class SentinelRaidManager {
         raid.waveActive      = false; // sentinels are gone; wave will re-spawn
         raids.put(pid, raid);
 
-        sendHud(overworld, pid, raid.completedWaves, true);
+        sendHud(overworld, pid, raid.completedWaves, true, 0);
     }
 
     /**
@@ -142,12 +142,20 @@ public class SentinelRaidManager {
 
             if (raid.waveActive) {
                 // ── Wave in progress: check for remaining sentinels ──────────
+                int beforeSize = raid.activeSentinels.size();
                 raid.activeSentinels.removeIf(uuid -> {
                     Entity e = level.getEntity(uuid);
                     if (e == null) return true;
                     if (e instanceof LivingEntity le) return le.getHealth() <= 0;
                     return e.isRemoved();
                 });
+                int afterSize = raid.activeSentinels.size();
+
+                // Send HUD update whenever enemy count drops
+                if (afterSize != beforeSize && afterSize > 0) {
+                    sendHud(level, pid, raid.completedWaves, true, afterSize);
+                    raid.lastSentEnemies = afterSize;
+                }
 
                 if (raid.activeSentinels.isEmpty()) {
                     // Wave cleared
@@ -156,14 +164,15 @@ public class SentinelRaidManager {
 
                     if (raid.completedWaves >= TOTAL_WAVES) {
                         // All 6 waves done — victory
-                        sendHud(level, pid, raid.completedWaves, false);
+                        sendHud(level, pid, raid.completedWaves, false, 0);
                         getSavedData(level).take(pid); // remove persisted data
                         it.remove();
                     } else {
                         raid.spawnTimer = BETWEEN_WAVE_DELAY;
-                        sendHud(level, pid, raid.completedWaves, true);
+                        sendHud(level, pid, raid.completedWaves, true, 0);
                         syncToSavedData(level, pid, raid);
                     }
+                    raid.lastSentEnemies = 0;
                 }
 
             } else {
@@ -202,6 +211,8 @@ public class SentinelRaidManager {
         }
 
         raid.waveActive = true;
+        raid.lastSentEnemies = raid.activeSentinels.size();
+        sendHud(level, raid.playerId, raid.completedWaves, true, raid.lastSentEnemies);
     }
 
     // ── Persistence helpers ───────────────────────────────────────────────────
@@ -221,10 +232,10 @@ public class SentinelRaidManager {
 
     // ── Packet helper ─────────────────────────────────────────────────────────
 
-    private static void sendHud(ServerLevel level, UUID pid, int completedWaves, boolean active) {
+    private static void sendHud(ServerLevel level, UUID pid, int completedWaves, boolean active, int enemiesLeft) {
         ServerPlayer player = level.getServer().getPlayerList().getPlayer(pid);
         if (player != null) {
-            PacketDistributor.sendToPlayer(player, new RaidUpdatePayload(completedWaves, active));
+            PacketDistributor.sendToPlayer(player, new RaidUpdatePayload(completedWaves, active, enemiesLeft));
         }
     }
 
@@ -232,9 +243,10 @@ public class SentinelRaidManager {
 
     private static final class SentinelRaid {
         final UUID playerId;
-        int     completedWaves = 0;
-        boolean waveActive     = false;
-        int     spawnTimer     = INTRO_DELAY;
+        int     completedWaves  = 0;
+        boolean waveActive      = false;
+        int     spawnTimer      = INTRO_DELAY;
+        int     lastSentEnemies = 0;
         final Set<UUID> activeSentinels = new HashSet<>();
 
         SentinelRaid(UUID playerId) { this.playerId = playerId; }

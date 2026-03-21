@@ -12,8 +12,9 @@ import net.minecraft.resources.ResourceLocation;
  *
  * completedWaves – how many waves have been fully defeated (0–6).
  * active         – whether the raid is currently in progress.
+ * enemiesLeft    – number of living sentinels remaining in the current wave.
  */
-public record RaidUpdatePayload(int completedWaves, boolean active)
+public record RaidUpdatePayload(int completedWaves, boolean active, int enemiesLeft)
         implements CustomPacketPayload {
 
     public static final Type<RaidUpdatePayload> TYPE =
@@ -23,6 +24,7 @@ public record RaidUpdatePayload(int completedWaves, boolean active)
             StreamCodec.composite(
                     ByteBufCodecs.INT,  RaidUpdatePayload::completedWaves,
                     ByteBufCodecs.BOOL, RaidUpdatePayload::active,
+                    ByteBufCodecs.INT,  RaidUpdatePayload::enemiesLeft,
                     RaidUpdatePayload::new
             );
 
