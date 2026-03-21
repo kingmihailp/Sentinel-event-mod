@@ -6,12 +6,15 @@ import com.example.meteormod.client.renderer.MeteorRenderer;
 import com.example.meteormod.client.renderer.SentinelBulletRenderer;
 import com.example.meteormod.client.renderer.SentinelRenderer;
 import com.example.meteormod.entity.ModEntities;
+import com.example.meteormod.particle.ModParticles;
+import com.example.meteormod.particle.SentinelBulletParticle;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
 
 @EventBusSubscriber(modid = MeteorMod.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ClientEventHandler {
@@ -21,6 +24,11 @@ public class ClientEventHandler {
         event.registerEntityRenderer(ModEntities.METEOR.get(), MeteorRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL.get(), SentinelRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL_BULLET.get(), SentinelBulletRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterParticles(RegisterParticleProvidersEvent event) {
+        event.registerSpriteSet(ModParticles.SENTINEL_BULLET.get(), SentinelBulletParticle.Provider::new);
     }
 
     @SubscribeEvent

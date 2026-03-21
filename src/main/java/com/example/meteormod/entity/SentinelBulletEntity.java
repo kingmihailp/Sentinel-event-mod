@@ -1,6 +1,6 @@
 package com.example.meteormod.entity;
 
-import net.minecraft.core.particles.ParticleTypes;
+import com.example.meteormod.particle.ModParticles;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -35,11 +35,11 @@ public class SentinelBulletEntity extends ThrowableProjectile {
         // Restore pre-tick velocity: bullet travels at constant speed (no drag)
         setDeltaMovement(vel);
 
-        // Blue soul-fire particle trail, visible on the client
+        // Animated sentinel_bullet particle trail, visible on the client
         if (level().isClientSide()) {
-            level().addParticle(ParticleTypes.SOUL_FIRE_FLAME,
+            level().addParticle(ModParticles.SENTINEL_BULLET.get(),
                     getX(), getY(), getZ(), 0, 0, 0);
-            level().addParticle(ParticleTypes.SOUL_FIRE_FLAME,
+            level().addParticle(ModParticles.SENTINEL_BULLET.get(),
                     getX() + (random.nextDouble() - 0.5) * 0.12,
                     getY() + (random.nextDouble() - 0.5) * 0.12,
                     getZ() + (random.nextDouble() - 0.5) * 0.12,

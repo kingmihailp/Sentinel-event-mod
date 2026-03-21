@@ -4,6 +4,7 @@ import com.example.meteormod.entity.ModEntities;
 import com.example.meteormod.item.ModBlocks;
 import com.example.meteormod.item.ModCreativeTabs;
 import com.example.meteormod.item.ModItems;
+import com.example.meteormod.particle.ModParticles;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 
@@ -17,5 +18,6 @@ public class MeteorMod {
         ModBlocks.BLOCKS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
+        ModParticles.PARTICLES.register(modEventBus);
     }
 }
