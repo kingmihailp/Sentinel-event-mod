@@ -2,17 +2,12 @@ package com.example.meteormod.event;
 
 import com.example.meteormod.MeteorConfig;
 import com.example.meteormod.MeteorMod;
-import com.example.meteormod.effect.ModEffects;
 import com.example.meteormod.entity.MeteorEntity;
 import com.example.meteormod.entity.ModEntities;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
@@ -136,21 +131,6 @@ public class MeteorSpawnHandler {
         meteor.setPos(pm.x, pm.y, pm.z);
         meteor.setDeltaMovement(pm.vx, pm.vy, pm.vz);
         level.addFreshEntity(meteor);
-    }
-
-    // ---------------------------------------------------------------------------
-
-    /** Freeze electrified entities in place every server tick. */
-    @SubscribeEvent
-    public static void onEntityTick(EntityTickEvent.Post event) {
-        if (!(event.getEntity() instanceof LivingEntity living)) return;
-        if (living.level().isClientSide()) return;
-        if (!living.hasEffect(ModEffects.ELECTRIFIED)) return;
-
-        living.setDeltaMovement(Vec3.ZERO);
-        if (living instanceof Mob mob) {
-            mob.getNavigation().stop();
-        }
     }
 
     private record PendingMeteor(double x, double y, double z, double vx, double vy, double vz) {}
