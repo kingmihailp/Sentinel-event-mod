@@ -40,7 +40,7 @@ public final class RaidHudOverlay {
     private static final int COLOR_DONE    = 0x44551111; // dim — waves cleared
     private static final int COLOR_BG      = 0xBB000000; // near-black backdrop
     private static final int COLOR_DIVIDER = 0xFF770000; // dark red line
-    private static final int COLOR_CODE    = 0xFF00BB44; // green code text
+    private static final int COLOR_CODE    = 0xFFDD1111; // red code text
     private static final int COLOR_BOTTOM  = 0xCC110000; // darker tint for bottom strip
 
     // Galactic alphabet font (Standard Galactic Alphabet / enchanting table font)
