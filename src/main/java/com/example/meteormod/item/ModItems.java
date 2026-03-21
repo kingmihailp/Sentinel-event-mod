@@ -49,6 +49,16 @@ public class ModItems {
                     new Item.Properties().rarity(Rarity.COMMON));
 
     /**
+     * Item form of the Suspicious Package block.
+     * Renders as a 3-D block in hand and inventory.
+     * Not added to any creative tab — obtain via /give only.
+     */
+    public static final DeferredItem<BlockItem> SUSPICIOUS_PACKAGE_ITEM =
+            ITEMS.registerItem("suspicious_package",
+                    props -> new BlockItem(ModBlocks.SUSPICIOUS_PACKAGE.get(), props),
+                    new Item.Properties().rarity(Rarity.EPIC));
+
+    /**
      * Internal item used only as the creative-tab icon.
      * Renders a live 3-D sentinel that follows the mouse cursor.
      * Never shown in the tab's item list.
