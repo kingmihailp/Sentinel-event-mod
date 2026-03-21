@@ -40,4 +40,14 @@ public class ModEntities {
                             .updateInterval(1)
                             .build("meteormod:sentinel_bullet")
             );
+
+    // ── Player EMP cannon bullet ─────────────────────────────────────────────
+    public static final DeferredHolder<EntityType<?>, EntityType<EmpBulletEntity>> EMP_BULLET =
+            ENTITIES.register("emp_bullet", () ->
+                    EntityType.Builder.<EmpBulletEntity>of(EmpBulletEntity::new, MobCategory.MISC)
+                            .sized(0.25f, 0.25f)
+                            .clientTrackingRange(64)
+                            .updateInterval(1)
+                            .build("meteormod:emp_bullet")
+            );
 }

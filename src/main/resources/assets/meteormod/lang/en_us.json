@@ -11,5 +11,7 @@
   "block.meteormod.sentinelmetal_block":  "Sentinel Metal Block",
   "block.meteormod.suspicious_package":   "Suspicious Package",
 
-  "item.meteormod.sentinel_cannon":       "Sentinel Cannon"
+  "item.meteormod.sentinel_cannon":       "Sentinel Cannon",
+
+  "effect.meteormod.electrified":         "Electrified"
 }

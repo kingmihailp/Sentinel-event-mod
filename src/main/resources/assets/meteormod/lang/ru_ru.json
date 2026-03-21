@@ -11,5 +11,7 @@
   "block.meteormod.sentinelmetal_block":  "Блок страж-металла",
   "block.meteormod.suspicious_package":   "Подозрительная посылка",
 
-  "item.meteormod.sentinel_cannon":       "Страж-пушка"
+  "item.meteormod.sentinel_cannon":       "Страж-пушка",
+
+  "effect.meteormod.electrified":         "Электризация"
 }

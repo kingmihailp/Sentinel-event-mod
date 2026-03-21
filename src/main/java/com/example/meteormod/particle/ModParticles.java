@@ -14,4 +14,7 @@ public class ModParticles {
 
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SENTINEL_BULLET =
             PARTICLES.register("sentinel_bullet", () -> new SimpleParticleType(false));
+
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> EMP_BULLET =
+            PARTICLES.register("emp_bullet", () -> new SimpleParticleType(false));
 }

@@ -1,5 +1,6 @@
 package com.example.meteormod;
 
+import com.example.meteormod.effect.ModEffects;
 import com.example.meteormod.entity.ModEntities;
 import com.example.meteormod.item.ModBlocks;
 import com.example.meteormod.item.ModCreativeTabs;
@@ -19,5 +20,6 @@ public class MeteorMod {
         ModItems.ITEMS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
         ModParticles.PARTICLES.register(modEventBus);
+        ModEffects.EFFECTS.register(modEventBus);
     }
 }

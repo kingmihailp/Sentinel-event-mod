@@ -2,10 +2,12 @@ package com.example.meteormod.event;
 
 import com.example.meteormod.MeteorMod;
 import com.example.meteormod.client.RaidHudOverlay;
+import com.example.meteormod.client.renderer.EmpBulletRenderer;
 import com.example.meteormod.client.renderer.MeteorRenderer;
 import com.example.meteormod.client.renderer.SentinelBulletRenderer;
 import com.example.meteormod.client.renderer.SentinelRenderer;
 import com.example.meteormod.entity.ModEntities;
+import com.example.meteormod.particle.EmpParticle;
 import com.example.meteormod.particle.ModParticles;
 import com.example.meteormod.particle.SentinelBulletParticle;
 import net.minecraft.resources.ResourceLocation;
@@ -24,11 +26,13 @@ public class ClientEventHandler {
         event.registerEntityRenderer(ModEntities.METEOR.get(), MeteorRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL.get(), SentinelRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL_BULLET.get(), SentinelBulletRenderer::new);
+        event.registerEntityRenderer(ModEntities.EMP_BULLET.get(), EmpBulletRenderer::new);
     }
 
     @SubscribeEvent
     public static void onRegisterParticles(RegisterParticleProvidersEvent event) {
         event.registerSpriteSet(ModParticles.SENTINEL_BULLET.get(), SentinelBulletParticle.Provider::new);
+        event.registerSpriteSet(ModParticles.EMP_BULLET.get(), EmpParticle.Provider::new);
     }
 
     @SubscribeEvent

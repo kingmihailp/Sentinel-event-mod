@@ -58,9 +58,9 @@ public class ModItems {
                     props -> new BlockItem(ModBlocks.SUSPICIOUS_PACKAGE.get(), props),
                     new Item.Properties().rarity(Rarity.EPIC));
 
-    /** Sentinel Cannon — placeholder item, 3D model to be replaced. */
-    public static final DeferredItem<Item> SENTINEL_CANNON =
-            ITEMS.registerSimpleItem("sentinel_cannon",
+    /** Sentinel Cannon — fires EMP rounds that electrify targets for 10 s. */
+    public static final DeferredItem<SentinelCannonItem> SENTINEL_CANNON =
+            ITEMS.registerItem("sentinel_cannon", SentinelCannonItem::new,
                     new Item.Properties().rarity(Rarity.EPIC).stacksTo(1));
 
     /**
