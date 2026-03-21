@@ -2,9 +2,9 @@
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
 	"textures": {
-		"0": "block/sentinel_cannon",
-		"1": "block/sentinel_cannon_wire",
-		"particle": "block/sentinel_cannon"
+		"0": "meteormod:item/sentinel_cannon",
+		"1": "meteormod:item/sentinel_cannon_wire",
+		"particle": "meteormod:item/sentinel_cannon"
 	},
 	"elements": [
 		{
