@@ -42,6 +42,10 @@ public final class RaidHudOverlay {
     private static final int COLOR_DIVIDER = 0xFF770000; // dark red line
     private static final int COLOR_CODE    = 0xFFDD1111; // red code text
     private static final int COLOR_BOTTOM  = 0xCC110000; // darker tint for bottom strip
+    private static final int COLOR_BORDER  = 0xFFBB0000; // red panel border
+
+    // Corner radius (in pixels) for the rounded-rect panels
+    private static final int RADIUS = 2;
 
     // Galactic alphabet font (Standard Galactic Alphabet / enchanting table font)
     private static final ResourceLocation GALACTIC_FONT =
@@ -119,7 +123,8 @@ public final class RaidHudOverlay {
         int codeX = divX + 1 + PAD;         // x where code text starts
 
         // ── Draw main panel ───────────────────────────────────────────────
-        g.fill(px1 - PAD, py1 - PAD, px2 + PAD, py2 + PAD, COLOR_BG);
+        fillRounded(g, px1 - PAD, py1 - PAD, px2 + PAD, py2 + PAD, COLOR_BG);
+        drawRoundedBorder(g, px1 - PAD, py1 - PAD, px2 + PAD, py2 + PAD, COLOR_BORDER);
 
         // Vertical divider between diamonds and code
         g.fill(divX, py1 - PAD, divX + 1, py2 + PAD, COLOR_DIVIDER);
@@ -144,7 +149,8 @@ public final class RaidHudOverlay {
         int bY1 = py2 + PAD + 3;
         int bY2 = bY1 + font.lineHeight + PAD * 2;
 
-        g.fill(px1 - PAD, bY1, px2 + PAD, bY2, COLOR_BOTTOM);
+        fillRounded(g, px1 - PAD, bY1, px2 + PAD, bY2, COLOR_BOTTOM);
+        drawRoundedBorder(g, px1 - PAD, bY1, px2 + PAD, bY2, COLOR_BORDER);
 
         // "WAVE: " rendered in Standard Galactic Alphabet
         Component galacticLabel = Component.literal("WAVE: ")
@@ -167,5 +173,32 @@ public final class RaidHudOverlay {
             int w = half - Math.abs(dy);
             g.fill(cx - w, cy + dy, cx + w + 1, cy + dy + 1, color);
         }
+    }
+
+    /**
+     * Fills a rectangle with 45° corner cuts (bevel radius = RADIUS).
+     * Equivalent to a rounded rect using two overlapping axis-aligned rects.
+     */
+    private static void fillRounded(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
+        int r = RADIUS;
+        g.fill(x1 + r, y1,     x2 - r, y2,     color); // horizontal band
+        g.fill(x1,     y1 + r, x2,     y2 - r, color); // vertical band
+    }
+
+    /**
+     * Draws a 1-px red border around a rounded rect (same bevel as fillRounded).
+     */
+    private static void drawRoundedBorder(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
+        int r = RADIUS;
+        // straight edges
+        g.fill(x1 + r, y1,      x2 - r, y1 + 1, color); // top
+        g.fill(x1 + r, y2 - 1, x2 - r, y2,     color); // bottom
+        g.fill(x1,     y1 + r, x1 + 1, y2 - r, color); // left
+        g.fill(x2 - 1, y1 + r, x2,     y2 - r, color); // right
+        // diagonal corner pixels
+        g.fill(x1 + r - 1, y1 + 1,     x1 + r, y1 + 2,     color); // top-left
+        g.fill(x2 - r,     y1 + 1,     x2 - r + 1, y1 + 2, color); // top-right
+        g.fill(x1 + r - 1, y2 - 2,     x1 + r, y2 - 1,     color); // bottom-left
+        g.fill(x2 - r,     y2 - 2,     x2 - r + 1, y2 - 1, color); // bottom-right
     }
 }
