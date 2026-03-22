@@ -68,6 +68,16 @@ public class ScopeOverlay {
         // ── 6. Rounded corner masks (solid black quarter-circles)
         drawRoundedCorners(gfx, w, h, 45);
 
+        // ── 6.5. Tactical grid — only inside the illuminated centre rectangle
+        final int GRID      = 20;           // cell size in pixels
+        final int GRID_COL  = 0x1A00FF55;   // ~10% opacity phosphor-green
+        for (int x = vx; x <= w - vx; x += GRID) {
+            gfx.fill(x, vy, x + 1, h - vy, GRID_COL);
+        }
+        for (int y = vy; y <= h - vy; y += GRID) {
+            gfx.fill(vx, y, w - vx, y + 1, GRID_COL);
+        }
+
         // ── 7. Crosshair
         int cx = w / 2;
         int cy = h / 2;
