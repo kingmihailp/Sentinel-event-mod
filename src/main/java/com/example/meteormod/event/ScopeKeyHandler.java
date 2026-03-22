@@ -120,7 +120,7 @@ public class ScopeKeyHandler {
             LevelRenderer.renderLineBox(poseStack, lines,
                     box.minX - camPos.x, box.minY - camPos.y, box.minZ - camPos.z,
                     box.maxX - camPos.x, box.maxY - camPos.y, box.maxZ - camPos.z,
-                    1.0f, 0.0f, 0.0f, 1.0f);
+                    0.867f, 0.067f, 0.067f, 1.0f); // #DD1111 — matches target name colour
         }
 
         bufferSource.endBatch(SCOPE_OUTLINE);
