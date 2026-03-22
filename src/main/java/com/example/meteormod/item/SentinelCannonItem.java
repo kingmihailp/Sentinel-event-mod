@@ -62,6 +62,14 @@ public class SentinelCannonItem extends Item {
         return BAR_COLOR;
     }
 
+    // ── Crafting ──────────────────────────────────────────────────────────
+
+    /** Called when the player takes this item out of any crafting result slot. */
+    @Override
+    public void onCraftedBy(ItemStack stack, Level level, Player player) {
+        setEnergy(stack, MAX_ENERGY);
+    }
+
     // ── Use ───────────────────────────────────────────────────────────────
 
     @Override
