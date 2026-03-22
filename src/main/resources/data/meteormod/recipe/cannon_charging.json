@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "meteormod:sentinel_cannon" },
+    { "item": "meteormod:guardian_battery" }
+  ],
+  "result": {
+    "id": "meteormod:sentinel_cannon",
+    "count": 1
+  }
+}
