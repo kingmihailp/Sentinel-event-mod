@@ -110,7 +110,22 @@ public class ScopeOverlay {
                     0xFF00FF55, false);
         }
 
-        // ── 7. Target entity name above crosshair ─────────────────────────
+        // ── 7. Bottom-left decoration: diamond + label
+        final int DIA_X  = 14;           // diamond centre x
+        final int DIA_Y  = h - 14;       // diamond centre y
+        final int DIA_R  = 4;            // half-size in pixels
+        final int DIA_COL = 0xFF00FF55;
+        for (int dy = -DIA_R; dy <= DIA_R; dy++) {
+            int half = DIA_R - Math.abs(dy);
+            gfx.fill(DIA_X - half, DIA_Y + dy, DIA_X + half + 1, DIA_Y + dy + 1, DIA_COL);
+        }
+        String atlasLabel = "AtlasOS v1.34.009";
+        gfx.drawString(mc.font, atlasLabel,
+                DIA_X + DIA_R + 5,
+                DIA_Y - mc.font.lineHeight / 2,
+                0xFF00FF55, false);
+
+        // ── 8. Target entity name above crosshair ─────────────────────────
         Entity target = findScopeTarget(mc);
         if (target != null) {
             String name = target.getDisplayName().getString();
