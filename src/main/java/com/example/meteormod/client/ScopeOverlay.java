@@ -4,9 +4,14 @@ import com.example.meteormod.item.ModItems;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+
+import java.util.Optional;
 
 @OnlyIn(Dist.CLIENT)
 public class ScopeOverlay {
@@ -100,6 +105,16 @@ public class ScopeOverlay {
                     h - vy / 2 - mc.font.lineHeight / 2,
                     0xFF00FF55, false);
         }
+
+        // ── 9. Target entity name above crosshair ─────────────────────────
+        Entity target = findScopeTarget(mc);
+        if (target != null) {
+            String name = target.getDisplayName().getString();
+            gfx.drawString(mc.font, name,
+                    cx - mc.font.width(name) / 2,
+                    cy - ARM - GAP - mc.font.lineHeight - 4,
+                    0xFFDD1111, false);
+        }
     }
 
     /**
@@ -120,6 +135,27 @@ public class ScopeOverlay {
             // Bottom-right
             gfx.fill(w - dx, h - dy - 1, w,  h - dy,     0xFF000000);
         }
+    }
+
+    /** Raycasts up to 64 blocks from the player's eye to find the closest entity in the crosshair. */
+    private static Entity findScopeTarget(Minecraft mc) {
+        if (mc.level == null || mc.player == null) return null;
+        Vec3 eye = mc.player.getEyePosition(1.0f);
+        Vec3 end = eye.add(mc.player.getViewVector(1.0f).scale(64.0));
+        Entity closest = null;
+        double bestDist = Double.MAX_VALUE;
+        for (Entity e : mc.level.entitiesForRendering()) {
+            if (e == mc.player) continue;
+            Optional<Vec3> hit = e.getBoundingBox().inflate(0.3).clip(eye, end);
+            if (hit.isPresent()) {
+                double d = eye.distanceTo(hit.get());
+                if (d < bestDist) {
+                    bestDist = d;
+                    closest = e;
+                }
+            }
+        }
+        return closest;
     }
 
     public static boolean holdsCannon(Player player) {
