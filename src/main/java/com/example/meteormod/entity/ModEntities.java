@@ -50,4 +50,14 @@ public class ModEntities {
                             .updateInterval(1)
                             .build("meteormod:emp_bullet")
             );
+
+    // ── Sentinel hover vehicle (rideable) ────────────────────────────────────
+    public static final DeferredHolder<EntityType<?>, EntityType<SentinelHoverEntity>> SENTINEL_HOVER =
+            ENTITIES.register("sentinel_hover", () ->
+                    EntityType.Builder.<SentinelHoverEntity>of(SentinelHoverEntity::new, MobCategory.MISC)
+                            .sized(2.0f, 0.8f)
+                            .clientTrackingRange(64)
+                            .updateInterval(3)
+                            .build("meteormod:sentinel_hover")
+            );
 }

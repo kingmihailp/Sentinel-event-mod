@@ -7,6 +7,7 @@ import com.example.meteormod.client.ScopeOverlay;
 import com.example.meteormod.client.renderer.EmpBulletRenderer;
 import com.example.meteormod.client.renderer.MeteorRenderer;
 import com.example.meteormod.client.renderer.SentinelBulletRenderer;
+import com.example.meteormod.client.renderer.SentinelHoverRenderer;
 import com.example.meteormod.client.renderer.SentinelRenderer;
 import com.example.meteormod.entity.ModEntities;
 import com.example.meteormod.particle.EmpParticle;
@@ -30,6 +31,7 @@ public class ClientEventHandler {
         event.registerEntityRenderer(ModEntities.SENTINEL.get(), SentinelRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL_BULLET.get(), SentinelBulletRenderer::new);
         event.registerEntityRenderer(ModEntities.EMP_BULLET.get(), EmpBulletRenderer::new);
+        event.registerEntityRenderer(ModEntities.SENTINEL_HOVER.get(), SentinelHoverRenderer::new);
     }
 
     @SubscribeEvent

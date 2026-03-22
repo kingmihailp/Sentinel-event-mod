@@ -28,6 +28,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.SENTINEL_METAL_BLOCK_ITEM.get());
                         output.accept(ModItems.GUARDIAN_BATTERY.get());
                         output.accept(ModItems.SENTINEL_CANNON.get());
+                        output.accept(ModItems.SENTINEL_HOVER.get());
                     })
                     .build());
 }

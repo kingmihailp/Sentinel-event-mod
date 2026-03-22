@@ -68,6 +68,11 @@ public class ModItems {
             ITEMS.registerSimpleItem("guardian_battery",
                     new Item.Properties().rarity(Rarity.RARE));
 
+    /** Spawn item for the Sentinel Hover vehicle. Right-click a block top to place. */
+    public static final DeferredItem<SentinelHoverItem> SENTINEL_HOVER =
+            ITEMS.registerItem("sentinel_hover", SentinelHoverItem::new,
+                    new Item.Properties().rarity(Rarity.EPIC).stacksTo(1));
+
     /**
      * Internal item used only as the creative-tab icon.
      * Renders a live 3-D sentinel that follows the mouse cursor.
