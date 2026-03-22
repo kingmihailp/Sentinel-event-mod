@@ -63,6 +63,11 @@ public class ModItems {
             ITEMS.registerItem("sentinel_cannon", SentinelCannonItem::new,
                     new Item.Properties().rarity(Rarity.EPIC).stacksTo(1));
 
+    /** Rare (aqua/blue name) — 5% drop from vanilla Guardian. */
+    public static final DeferredItem<Item> GUARDIAN_BATTERY =
+            ITEMS.registerSimpleItem("guardian_battery",
+                    new Item.Properties().rarity(Rarity.RARE));
+
     /**
      * Internal item used only as the creative-tab icon.
      * Renders a live 3-D sentinel that follows the mouse cursor.
