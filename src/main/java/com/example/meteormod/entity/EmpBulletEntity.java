@@ -139,11 +139,7 @@ public class EmpBulletEntity extends ThrowableProjectile {
             chained.hurt(damageSources().lightningBolt(), heavy ? HEAVY_DAMAGE : NORMAL_DAMAGE);
             chained.addEffect(new MobEffectInstance(ModEffects.ELECTRIFIED, EFFECT_DURATION, 0));
 
-            // Visual-only lightning bolt at the chained enemy
-            spawnLightning(level,
-                    chained.getX(), chained.getY(), chained.getZ(), true);
-
-            // ELECTRIC_SPARK particle arc from origin → chained enemy
+            // ELECTRIC_SPARK particle arc from origin → chained enemy (no lightning bolt here)
             spawnChainArc(level, origin, chained);
         }
     }
