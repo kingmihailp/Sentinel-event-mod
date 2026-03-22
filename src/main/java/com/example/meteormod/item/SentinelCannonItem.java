@@ -1,7 +1,7 @@
 package com.example.meteormod.item;
 
 import com.example.meteormod.entity.EmpBulletEntity;
-import net.minecraft.sounds.SoundEvents;
+import com.example.meteormod.sound.ModSounds;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -33,7 +33,7 @@ public class SentinelCannonItem extends Item {
 
             level.addFreshEntity(bullet);
             level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                    SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.PLAYERS, 0.6f, 1.8f);
+                    ModSounds.SENTINEL_CANNON_SHOOT.get(), SoundSource.PLAYERS, 0.6f, 1.8f);
         }
 
         player.getCooldowns().addCooldown(this, COOLDOWN_TICKS);
