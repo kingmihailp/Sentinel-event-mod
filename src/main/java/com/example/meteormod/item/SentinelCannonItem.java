@@ -33,7 +33,7 @@ public class SentinelCannonItem extends Item {
 
             level.addFreshEntity(bullet);
             level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                    ModSounds.SENTINEL_CANNON_SHOOT.get(), SoundSource.PLAYERS, 0.6f, 1.8f);
+                    ModSounds.SENTINEL_CANNON_SHOOT, SoundSource.PLAYERS, 0.6f, 1.8f);
         }
 
         player.getCooldowns().addCooldown(this, COOLDOWN_TICKS);
