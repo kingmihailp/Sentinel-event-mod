@@ -3,11 +3,14 @@ package com.example.meteormod.event;
 import com.example.meteormod.MeteorMod;
 import com.example.meteormod.client.ModKeyBindings;
 import com.example.meteormod.client.ScopeOverlay;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
@@ -20,9 +23,35 @@ import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
+import java.util.OptionalDouble;
+
 /** Client-only GAME-bus handlers for the Sentinel Cannon scope mode. */
 @EventBusSubscriber(modid = MeteorMod.MOD_ID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
 public class ScopeKeyHandler {
+
+    /**
+     * Custom render type for scope entity outlines:
+     * - Lines shader
+     * - NO depth test  → visible through walls
+     * - MAIN_TARGET    → goes to the main framebuffer in all graphic modes
+     * - COLOR_WRITE    → writes colour only (no depth pollution)
+     * - Translucent blending + no culling
+     */
+    private static final RenderType SCOPE_OUTLINE = RenderType.create(
+            "meteormod:scope_outline",
+            DefaultVertexFormat.POSITION_COLOR_NORMAL,
+            VertexFormat.Mode.LINES,
+            1536,
+            RenderType.CompositeState.builder()
+                    .setShaderState(RenderStateShard.RENDERTYPE_LINES_SHADER)
+                    .setLineState(new RenderStateShard.LineStateShard(OptionalDouble.empty()))
+                    .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING)
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setOutputState(RenderStateShard.MAIN_TARGET)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
+                    .createCompositeState(false));
 
     // ── Toggle scope on keybind press ──────────────────────────────────────
 
@@ -84,7 +113,7 @@ public class ScopeKeyHandler {
         Vec3 camPos = event.getCamera().getPosition();
         PoseStack poseStack = event.getPoseStack();
         MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
-        VertexConsumer lines = bufferSource.getBuffer(RenderType.lines());
+        VertexConsumer lines = bufferSource.getBuffer(SCOPE_OUTLINE);
 
         for (Entity entity : mc.level.entitiesForRendering()) {
             AABB box = entity.getBoundingBox();
@@ -94,6 +123,6 @@ public class ScopeKeyHandler {
                     1.0f, 0.0f, 0.0f, 1.0f);
         }
 
-        bufferSource.endBatch(RenderType.lines());
+        bufferSource.endBatch(SCOPE_OUTLINE);
     }
 }

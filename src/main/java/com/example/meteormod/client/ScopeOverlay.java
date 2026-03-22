@@ -52,17 +52,7 @@ public class ScopeOverlay {
         // ── 2. Phosphor glow tint
         gfx.fill(0, 0, w, h, 0x4000CC22);
 
-        // ── 3. Horizontal scanlines every 3px
-        for (int y = 0; y < h; y += 3) {
-            gfx.fill(0, y, w, y + 1, 0x44000000);
-        }
-
-        // ── 4. Vertical pixel-grid every 4px
-        for (int x = 0; x < w; x += 4) {
-            gfx.fill(x, 0, x + 1, h, 0x33000000);
-        }
-
-        // ── 5. Vignette
+        // ── 3. Vignette
         int vx = w / 5;
         int vy = h / 5;
         gfx.fill(0,      0,      vx,     h,      0x88000000);
@@ -70,20 +60,10 @@ public class ScopeOverlay {
         gfx.fill(vx,     0,      w - vx, vy,     0x88000000);
         gfx.fill(vx,     h - vy, w - vx, h,      0x88000000);
 
-        // ── 6. Rounded corner masks (solid black quarter-circles)
+        // ── 4. Rounded corner masks (solid black quarter-circles)
         drawRoundedCorners(gfx, w, h, 45);
 
-        // ── 6.5. Tactical grid — only inside the illuminated centre rectangle
-        final int GRID      = 20;           // cell size in pixels
-        final int GRID_COL  = 0x1A00FF55;   // ~10% opacity phosphor-green
-        for (int x = vx; x <= w - vx; x += GRID) {
-            gfx.fill(x, vy, x + 1, h - vy, GRID_COL);
-        }
-        for (int y = vy; y <= h - vy; y += GRID) {
-            gfx.fill(vx, y, w - vx, y + 1, GRID_COL);
-        }
-
-        // ── 7. Crosshair
+        // ── 5. Crosshair
         int cx = w / 2;
         int cy = h / 2;
         final int GAP   = 5;
@@ -97,7 +77,7 @@ public class ScopeOverlay {
         gfx.fill(cx - THICK / 2, cy + GAP,           cx + THICK / 2 + 1, cy + ARM + GAP, COLOR);
         gfx.fill(cx - 1, cy - 1, cx + 2, cy + 2, COLOR);
 
-        // ── 8. Zoom level indicator (bottom-right, if zoomed)
+        // ── 6. Zoom level indicator (bottom-right, if zoomed)
         if (zoomLevel > 0) {
             String zoomText = (zoomLevel + 1) + "x";
             gfx.drawString(mc.font, zoomText,
@@ -106,7 +86,7 @@ public class ScopeOverlay {
                     0xFF00FF55, false);
         }
 
-        // ── 9. Target entity name above crosshair ─────────────────────────
+        // ── 7. Target entity name above crosshair ─────────────────────────
         Entity target = findScopeTarget(mc);
         if (target != null) {
             String name = target.getDisplayName().getString();
