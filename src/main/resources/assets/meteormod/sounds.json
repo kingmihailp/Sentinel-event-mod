@@ -1,0 +1,12 @@
+{
+  "sentinel_cannon_shoot": {
+    "subtitle": "subtitles.meteormod.sentinel_cannon_shoot",
+    "sounds": [
+      {
+        "name": "meteormod:sentinel_cannon_shoot",
+        "volume": 1.0,
+        "pitch": 1.0
+      }
+    ]
+  }
+}
