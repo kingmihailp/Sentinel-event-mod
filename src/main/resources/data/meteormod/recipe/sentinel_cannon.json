@@ -1,16 +1,17 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "IS ",
-    "BPM",
+    " IT",
+    "BPL",
     "SG "
   ],
   "key": {
     "I": { "item": "meteormod:sentinelmetal_ingot" },
-    "S": { "item": "minecraft:stick" },
-    "B": { "item": "minecraft:copper_block" },
+    "T": { "item": "minecraft:spyglass" },
+    "B": { "item": "meteormod:sentinelmetal_block" },
     "P": { "item": "meteormod:large_sentinel_scrap" },
-    "M": { "item": "meteormod:sentinelmetal_block" },
+    "L": { "item": "minecraft:lightning_rod" },
+    "S": { "item": "minecraft:stick" },
     "G": { "item": "meteormod:guardian_battery" }
   },
   "result": {
