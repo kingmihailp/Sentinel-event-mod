@@ -1,4 +1,13 @@
 {
+  "sentinel_cannon_target_ambient": {
+    "subtitle": "subtitles.meteormod.sentinel_cannon_target_ambient",
+    "sounds": [
+      {
+        "name": "meteormod:sentinel_cannon_target_ambient",
+        "stream": true
+      }
+    ]
+  },
   "sentinel_cannon_shoot": {
     "subtitle": "subtitles.meteormod.sentinel_cannon_shoot",
     "sounds": [

@@ -13,7 +13,8 @@ public class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
             DeferredRegister.create(BuiltInRegistries.SOUND_EVENT, MeteorMod.MOD_ID);
 
-    public static final Supplier<SoundEvent> SENTINEL_CANNON_SHOOT = register("sentinel_cannon_shoot");
+    public static final Supplier<SoundEvent> SENTINEL_CANNON_SHOOT        = register("sentinel_cannon_shoot");
+    public static final Supplier<SoundEvent> SENTINEL_CANNON_TARGET_AMBIENT = register("sentinel_cannon_target_ambient");
 
     private static Supplier<SoundEvent> register(String name) {
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, name);
