@@ -1,7 +1,9 @@
 package com.example.meteormod.event;
 
 import com.example.meteormod.MeteorMod;
+import com.example.meteormod.client.ModKeyBindings;
 import com.example.meteormod.client.RaidHudOverlay;
+import com.example.meteormod.client.ScopeOverlay;
 import com.example.meteormod.client.renderer.EmpBulletRenderer;
 import com.example.meteormod.client.renderer.MeteorRenderer;
 import com.example.meteormod.client.renderer.SentinelBulletRenderer;
@@ -16,7 +18,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
+import net.neoforged.neoforge.event.InputEvent;
 
 @EventBusSubscriber(modid = MeteorMod.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ClientEventHandler {
@@ -41,5 +45,14 @@ public class ClientEventHandler {
                 ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "raid_hud"),
                 RaidHudOverlay::render
         );
+        event.registerAboveAll(
+                ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "scope_overlay"),
+                ScopeOverlay::render
+        );
+    }
+
+    @SubscribeEvent
+    public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
+        event.register(ModKeyBindings.SCOPE_KEY);
     }
 }

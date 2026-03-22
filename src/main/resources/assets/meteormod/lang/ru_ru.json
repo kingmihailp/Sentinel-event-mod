@@ -13,5 +13,8 @@
 
   "item.meteormod.sentinel_cannon":       "Страж-пушка",
 
-  "effect.meteormod.electrified":         "Электризация"
+  "effect.meteormod.electrified":         "Электризация",
+
+  "key.category.meteormod":               "Sentinel Mod",
+  "key.meteormod.scope":                  "Режим прицела пушки"
 }
