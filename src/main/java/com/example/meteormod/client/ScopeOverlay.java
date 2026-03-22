@@ -49,8 +49,8 @@ public class ScopeOverlay {
         // ── 1. Dark green base
         gfx.fill(0, 0, w, h, 0xD5001A00);
 
-        // ── 2. Phosphor glow tint
-        gfx.fill(0, 0, w, h, 0x4000CC22);
+        // ── 2. Phosphor glow tint (kept subtle so entity outlines show through)
+        gfx.fill(0, 0, w, h, 0x1800CC22);
 
         // ── 3. Vignette
         int vx = w / 5;
@@ -60,19 +60,27 @@ public class ScopeOverlay {
         gfx.fill(vx,     0,      w - vx, vy,     0x88000000);
         gfx.fill(vx,     h - vy, w - vx, h,      0x88000000);
 
-        // ── 4. Grid — only in the four dark outer strips (outside the centre rect)
-        final int GRID     = 20;
-        final int GRID_COL = 0x1A00FF55;  // ~10 % opacity phosphor-green
-        // Vertical lines across the full height, but only in left/right strips
+        // ── 4. Grid — everywhere EXCEPT the central crosshair rectangle
+        final int GRID     = 10;
+        final int GRID_COL = 0x2200FF55;
         for (int x = 0; x < w; x += GRID) {
             if (x < vx || x >= w - vx) {
+                // Left / right strips: full height
                 gfx.fill(x, 0, x + 1, h, GRID_COL);
+            } else {
+                // Centre column range: only top and bottom strips
+                gfx.fill(x, 0,      x + 1, vy,     GRID_COL);
+                gfx.fill(x, h - vy, x + 1, h,      GRID_COL);
             }
         }
-        // Horizontal lines across the full width, but only in top/bottom strips
         for (int y = 0; y < h; y += GRID) {
             if (y < vy || y >= h - vy) {
+                // Top / bottom strips: full width
                 gfx.fill(0, y, w, y + 1, GRID_COL);
+            } else {
+                // Centre row range: only left and right strips
+                gfx.fill(0,      y, vx,     y + 1, GRID_COL);
+                gfx.fill(w - vx, y, w,      y + 1, GRID_COL);
             }
         }
 
