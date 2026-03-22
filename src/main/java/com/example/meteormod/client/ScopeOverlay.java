@@ -60,7 +60,23 @@ public class ScopeOverlay {
         gfx.fill(vx,     0,      w - vx, vy,     0x88000000);
         gfx.fill(vx,     h - vy, w - vx, h,      0x88000000);
 
-        // ── 4. Rounded corner masks (solid black quarter-circles)
+        // ── 4. Grid — only in the four dark outer strips (outside the centre rect)
+        final int GRID     = 20;
+        final int GRID_COL = 0x1A00FF55;  // ~10 % opacity phosphor-green
+        // Vertical lines across the full height, but only in left/right strips
+        for (int x = 0; x < w; x += GRID) {
+            if (x < vx || x >= w - vx) {
+                gfx.fill(x, 0, x + 1, h, GRID_COL);
+            }
+        }
+        // Horizontal lines across the full width, but only in top/bottom strips
+        for (int y = 0; y < h; y += GRID) {
+            if (y < vy || y >= h - vy) {
+                gfx.fill(0, y, w, y + 1, GRID_COL);
+            }
+        }
+
+        // ── 5. Rounded corner masks (solid black quarter-circles)
         drawRoundedCorners(gfx, w, h, 45);
 
         // ── 5. Crosshair
