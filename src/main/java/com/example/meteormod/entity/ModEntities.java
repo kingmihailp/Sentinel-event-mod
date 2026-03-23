@@ -57,7 +57,7 @@ public class ModEntities {
                     EntityType.Builder.<SentinelHoverEntity>of(SentinelHoverEntity::new, MobCategory.MISC)
                             .sized(2.0f, 0.8f)
                             .clientTrackingRange(64)
-                            .updateInterval(3)
+                            .updateInterval(1)
                             .build("meteormod:sentinel_hover")
             );
 }

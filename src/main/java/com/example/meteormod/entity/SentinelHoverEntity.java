@@ -7,6 +7,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
+import com.example.meteormod.item.ModItems;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -14,6 +15,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -90,7 +92,17 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
-        if (player.isSecondaryUseActive()) return InteractionResult.PASS;
+        if (player.isSecondaryUseActive()) {
+            // Shift+right-click: pick up the hover
+            if (!this.level().isClientSide()) {
+                ItemStack item = new ItemStack(ModItems.SENTINEL_HOVER.get());
+                if (!player.getInventory().add(item)) {
+                    this.spawnAtLocation(item);
+                }
+                this.discard();
+            }
+            return InteractionResult.sidedSuccess(this.level().isClientSide());
+        }
         if (!this.level().isClientSide()) {
             return player.startRiding(this) ? InteractionResult.CONSUME : InteractionResult.PASS;
         }
@@ -108,8 +120,8 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
 
         // ── Horizontal ──────────────────────────────────────────────────
         if (rider instanceof Player player) {
+            this.yRotO = this.getYRot();
             this.setYRot(player.getYRot());
-            this.yRotO = player.yRotO;
 
             float forward = player.zza;
             float strafe  = player.xxa;
