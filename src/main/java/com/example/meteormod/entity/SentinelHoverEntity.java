@@ -1,6 +1,8 @@
 package com.example.meteormod.entity;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -14,22 +16,25 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.animation.AnimationController;
-import software.bernie.geckolib.animation.AnimatableManager;
-import software.bernie.geckolib.animation.RawAnimation;
+import software.bernie.geckolib.animation.*;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
 public class SentinelHoverEntity extends Entity implements GeoEntity {
 
-    private static final float SPEED     = 0.25f;   // blocks per tick at full input
-    private static final float FRICTION  = 0.80f;   // speed decay when no input
-    private static final float GRAVITY   = 0.04f;
+    private static final float SPEED    = 0.25f;
+    private static final float FRICTION = 0.80f;
+    private static final float GRAVITY  = 0.04f;
 
-    private static final RawAnimation ANIM_IDLE =
-            RawAnimation.begin().thenLoop("idle");
+    // 0 = idle, 1 = forward, 2 = backward — synced to clients for animation
+    private static final EntityDataAccessor<Byte> MOVE_STATE =
+            SynchedEntityData.defineId(SentinelHoverEntity.class, EntityDataSerializers.BYTE);
 
-    private final AnimatableInstanceCache animCache =
-            GeckoLibUtil.createInstanceCache(this);
+    private static final RawAnimation ANIM_THRUSTER      = RawAnimation.begin().thenLoop("thruster");
+    private static final RawAnimation ANIM_ENG_FORWARD   = RawAnimation.begin().thenPlayAndHold("top engines vpered");
+    private static final RawAnimation ANIM_ENG_BACKWARD  = RawAnimation.begin().thenPlayAndHold("engines nazad");
+    private static final RawAnimation ANIM_SHOOT         = RawAnimation.begin().thenPlay("shoot");
+
+    private final AnimatableInstanceCache animCache = GeckoLibUtil.createInstanceCache(this);
 
     public SentinelHoverEntity(EntityType<?> type, Level level) {
         super(type, level);
@@ -39,13 +44,21 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
     // ── Required Entity overrides ─────────────────────────────────────────
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {}
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        builder.define(MOVE_STATE, (byte) 0);
+    }
 
     @Override
     protected void readAdditionalSaveData(CompoundTag tag) {}
 
     @Override
     protected void addAdditionalSaveData(CompoundTag tag) {}
+
+    // ── Movement state accessor (used by animation controllers) ──────────
+
+    public byte getMoveState() {
+        return this.entityData.get(MOVE_STATE);
+    }
 
     // ── Collision / push behaviour ────────────────────────────────────────
 
@@ -82,13 +95,17 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
 
         LivingEntity rider = this.getControllingPassenger();
         if (rider instanceof Player player) {
-            // Mirror yaw to the rider's facing direction
             this.setYRot(player.getYRot());
             this.yRotO = player.yRotO;
 
-            // xxa = strafe, zza = forward (populated server-side via ServerboundPlayerInputPacket)
             float forward = player.zza;
             float strafe  = player.xxa;
+
+            // Sync move direction for animations (server → client via SynchedEntityData)
+            if (!this.level().isClientSide()) {
+                byte state = (forward > 0) ? (byte) 1 : (forward < 0) ? (byte) 2 : (byte) 0;
+                this.entityData.set(MOVE_STATE, state);
+            }
 
             if (forward != 0f || strafe != 0f) {
                 double yaw = Math.toRadians(this.getYRot());
@@ -100,12 +117,13 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
                 this.setDeltaMovement(v.x * FRICTION, v.y, v.z * FRICTION);
             }
         } else {
-            // Decelerate when unridden
+            if (!this.level().isClientSide()) {
+                this.entityData.set(MOVE_STATE, (byte) 0);
+            }
             Vec3 v = this.getDeltaMovement();
             this.setDeltaMovement(v.x * FRICTION, v.y, v.z * FRICTION);
         }
 
-        // Gravity
         if (!this.onGround()) {
             this.setDeltaMovement(getDeltaMovement().add(0, -GRAVITY, 0));
         } else {
@@ -117,10 +135,31 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
 
     // ── GeckoLib ──────────────────────────────────────────────────────────
 
+    /** Trigger the shoot recoil animation (call this when the cannons fire). */
+    public void triggerShootAnimation() {
+        this.triggerAnim("shoot_controller", "shoot");
+    }
+
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "idle", state ->
-                state.setAndContinue(ANIM_IDLE)));
+
+        // 1. Thruster vibration — plays continuously at all times
+        controllers.add(new AnimationController<>(this, "thruster_controller", state ->
+                state.setAndContinue(ANIM_THRUSTER)));
+
+        // 2. Engine tilt — forward / backward / reset to neutral
+        controllers.add(new AnimationController<>(this, "engines_controller", state -> {
+            byte move = state.getAnimatable().getMoveState();
+            if (move == 1) return state.setAndContinue(ANIM_ENG_FORWARD);
+            if (move == 2) return state.setAndContinue(ANIM_ENG_BACKWARD);
+            return PlayState.STOP; // neutral: bones reset to bind pose
+        }));
+
+        // 3. Shoot recoil — triggered externally via triggerShootAnimation()
+        controllers.add(
+                new AnimationController<>(this, "shoot_controller", state -> PlayState.STOP)
+                        .triggerableAnim("shoot", ANIM_SHOOT)
+        );
     }
 
     @Override
