@@ -1,10 +1,12 @@
 package com.example.meteormod.entity;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -23,11 +25,10 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class SentinelHoverEntity extends Entity implements GeoEntity {
 
     // ── Movement constants ────────────────────────────────────────────────
-    private static final float SPEED      = 0.25f;   // horizontal b/t at full input
-    private static final float FRICTION   = 0.80f;   // horizontal drag when no input
-    private static final float RISE_FORCE = 0.12f;   // upward accel while Space held
-    private static final float GRAVITY    = 0.04f;   // downward accel when not thrusting
-    private static final float MAX_VY     = 0.50f;   // vertical speed cap
+    private static final float  SPEED        = 0.25f;  // horizontal b/t at full input
+    private static final float  FRICTION     = 0.80f;  // horizontal drag when no input
+    private static final double HOVER_HEIGHT = 1.5;    // target blocks above ground
+    private static final float  MAX_VY       = 0.40f;  // vertical speed cap
 
     // 0 = idle, 1 = forward, 2 = backward — synced to clients for animation
     private static final EntityDataAccessor<Byte> MOVE_STATE =
@@ -127,22 +128,15 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
                 vel = new Vec3(vel.x * FRICTION, vel.y, vel.z * FRICTION);
             }
 
-            // ── Vertical (Space = rise) ──────────────────────────────────
-            if (player.jumping) {
-                vel = new Vec3(vel.x, Math.min(vel.y + RISE_FORCE, MAX_VY), vel.z);
-            } else if (this.onGround()) {
-                vel = new Vec3(vel.x, 0, vel.z);
-            } else {
-                vel = new Vec3(vel.x, Math.max(vel.y - GRAVITY, -MAX_VY), vel.z);
-            }
+            // ── Vertical (auto-hover via spring-damper) ──────────────────
+            vel = new Vec3(vel.x, hoverVelocity(), vel.z);
 
         } else {
-            // No rider — decelerate and fall
+            // No rider — decelerate and settle toward hover height
             if (!this.level().isClientSide()) {
                 this.entityData.set(MOVE_STATE, (byte) 0);
             }
-            double vy = this.onGround() ? 0 : Math.max(vel.y - GRAVITY, -MAX_VY);
-            vel = new Vec3(vel.x * FRICTION, vy, vel.z * FRICTION);
+            vel = new Vec3(vel.x * FRICTION, hoverVelocity(), vel.z * FRICTION);
         }
 
         this.setDeltaMovement(vel);
@@ -152,6 +146,31 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
         if (this.level().isClientSide()) {
             spawnTurbineParticles();
         }
+    }
+
+    // ── Hover physics helpers ─────────────────────────────────────────────
+
+    /**
+     * Spring-damper: smoothly drives the entity toward HOVER_HEIGHT above
+     * the nearest solid block below.  Returns the new Y velocity.
+     */
+    private double hoverVelocity() {
+        double groundY = groundBelow();
+        double error   = (groundY + HOVER_HEIGHT) - this.getY();
+        // spring (0.18) + damper (−0.45 × current vy)
+        return Mth.clamp(error * 0.18 - this.getDeltaMovement().y * 0.45, -MAX_VY, MAX_VY);
+    }
+
+    /** Finds the Y of the first solid block within 12 blocks below the entity. */
+    private double groundBelow() {
+        for (int i = 0; i <= 12; i++) {
+            BlockPos pos = BlockPos.containing(this.getX(), this.getY() - i - 0.1, this.getZ());
+            if (!this.level().getBlockState(pos).isAir()) {
+                return pos.getY() + 1.0;
+            }
+        }
+        // Nothing found — stay at current height
+        return this.getY() - HOVER_HEIGHT;
     }
 
     // ── Turbine particle FX ───────────────────────────────────────────────
