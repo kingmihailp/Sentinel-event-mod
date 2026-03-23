@@ -80,7 +80,7 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
     /** Lower the passenger so the player sits inside/below the panel instead of on top. */
     @Override
     protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float partialTick) {
-        return new Vec3(0.0, 0.2, 0.0);
+        return new Vec3(0.0, 0.35, 0.0);
     }
 
     // ── Movement state accessor (used by animation controllers) ──────────
