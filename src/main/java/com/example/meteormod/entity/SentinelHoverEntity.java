@@ -65,10 +65,6 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
         return this.getFirstPassenger() instanceof LivingEntity le ? le : null;
     }
 
-    /** Player sits 0.35 blocks above the entity's bottom (top of the body). */
-    @Override
-    protected double getPassengersRidingOffset() { return 0.35; }
-
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
         if (player.isSecondaryUseActive()) return InteractionResult.PASS;
