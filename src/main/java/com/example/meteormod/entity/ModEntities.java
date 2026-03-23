@@ -60,4 +60,14 @@ public class ModEntities {
                             .updateInterval(1)
                             .build("meteormod:sentinel_hover")
             );
+
+    // ── Hover turret laser bullet ────────────────────────────────────────────
+    public static final DeferredHolder<EntityType<?>, EntityType<TurretBulletEntity>> TURRET_BULLET =
+            ENTITIES.register("turret_bullet", () ->
+                    EntityType.Builder.<TurretBulletEntity>of(TurretBulletEntity::new, MobCategory.MISC)
+                            .sized(0.15f, 0.15f)
+                            .clientTrackingRange(64)
+                            .updateInterval(1)
+                            .build("meteormod:turret_bullet")
+            );
 }

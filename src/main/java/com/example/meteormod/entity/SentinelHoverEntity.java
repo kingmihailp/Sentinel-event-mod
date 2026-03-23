@@ -33,9 +33,15 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
     private static final double HOVER_HEIGHT = 1.5;    // target blocks above ground
     private static final float  MAX_VY       = 0.40f;  // vertical speed cap
 
+    /** Ticks between turret shots (0.5 s). Exposed for HoverHudOverlay cooldown bar. */
+    public static final int SHOOT_COOLDOWN_TICKS = 10;
+
     // 0 = idle, 1 = forward, 2 = backward — synced to clients for animation
     private static final EntityDataAccessor<Byte> MOVE_STATE =
             SynchedEntityData.defineId(SentinelHoverEntity.class, EntityDataSerializers.BYTE);
+
+    /** Server-side shoot cooldown counter. */
+    private int shootCooldown = 0;
 
     private static final RawAnimation ANIM_THRUSTER      = RawAnimation.begin().thenLoop("thruster");
     private static final RawAnimation ANIM_ENG_FORWARD   = RawAnimation.begin().thenPlayAndHold("top engines vpered");
@@ -136,6 +142,7 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
             if (!this.level().isClientSide()) {
                 byte ms = (forward > 0) ? (byte) 1 : (forward < 0) ? (byte) 2 : (byte) 0;
                 this.entityData.set(MOVE_STATE, ms);
+                if (shootCooldown > 0) shootCooldown--;
             }
 
             if (forward != 0f || strafe != 0f) {
@@ -259,6 +266,34 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
     /** Trigger the shoot recoil animation (call when the cannons fire). */
     public void triggerShootAnimation() {
         this.triggerAnim("shoot_controller", "shoot");
+    }
+
+    /**
+     * Server-side: fires a laser burst from both turret barrels toward the player's look direction.
+     * Called by the network handler when a ShootHoverPacket arrives from the rider.
+     *
+     * Turret positions derived from the geo model (16 model-units = 1 block).
+     * GeckoLib 180° convention: model +X → entity LEFT (= -right), model −Z → entity FORWARD.
+     * turret_left cube: origin [8, 7.7, −25.5], so muzzle ≈ 0.54 left, 0.55 up, 1.59 forward.
+     */
+    public void shootTurrets(net.minecraft.world.entity.player.Player player) {
+        if (this.level().isClientSide()) return;
+        if (shootCooldown > 0) return;
+
+        Vec3 look  = player.getLookAngle();
+        Vec3 fwd   = Vec3.directionFromRotation(0, this.getYRot());
+        Vec3 rgt   = Vec3.directionFromRotation(0, this.getYRot() + 90f);
+        Vec3 base  = this.position().add(0, 0.55, 0);
+
+        // Left barrel (model +X = entity -right) and mirrored right barrel
+        Vec3 leftMuzzle  = base.add(fwd.scale(1.59)).add(rgt.scale(-0.54));
+        Vec3 rightMuzzle = base.add(fwd.scale(1.59)).add(rgt.scale( 0.54));
+
+        this.level().addFreshEntity(new TurretBulletEntity(this.level(), player, leftMuzzle,  look));
+        this.level().addFreshEntity(new TurretBulletEntity(this.level(), player, rightMuzzle, look));
+
+        shootCooldown = SHOOT_COOLDOWN_TICKS;
+        triggerShootAnimation();
     }
 
     @Override

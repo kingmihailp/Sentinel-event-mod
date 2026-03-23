@@ -4,7 +4,10 @@ import com.example.meteormod.MeteorMod;
 import com.example.meteormod.client.RaidHudOverlay;
 import com.example.meteormod.entity.ModEntities;
 import com.example.meteormod.entity.SentinelEntity;
+import com.example.meteormod.entity.SentinelHoverEntity;
 import com.example.meteormod.network.RaidUpdatePayload;
+import com.example.meteormod.network.ShootHoverPacket;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -41,6 +44,18 @@ public class ModEventHandler {
                             }
                         }
                 )
+        );
+
+        // ShootHoverPacket: client → server — rider pressed LMB, fire turrets.
+        registrar.playToServer(
+                ShootHoverPacket.TYPE,
+                ShootHoverPacket.STREAM_CODEC,
+                (payload, ctx) -> ctx.enqueueWork(() -> {
+                    if (ctx.player() instanceof ServerPlayer sp
+                            && sp.getVehicle() instanceof SentinelHoverEntity hover) {
+                        hover.shootTurrets(sp);
+                    }
+                })
         );
     }
 }

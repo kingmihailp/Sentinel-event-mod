@@ -1,6 +1,7 @@
 package com.example.meteormod.event;
 
 import com.example.meteormod.MeteorMod;
+import com.example.meteormod.client.HoverHudOverlay;
 import com.example.meteormod.client.ModKeyBindings;
 import com.example.meteormod.client.RaidHudOverlay;
 import com.example.meteormod.client.ScopeOverlay;
@@ -9,6 +10,7 @@ import com.example.meteormod.client.renderer.MeteorRenderer;
 import com.example.meteormod.client.renderer.SentinelBulletRenderer;
 import com.example.meteormod.client.renderer.SentinelHoverRenderer;
 import com.example.meteormod.client.renderer.SentinelRenderer;
+import com.example.meteormod.client.renderer.TurretBulletRenderer;
 import com.example.meteormod.entity.ModEntities;
 import com.example.meteormod.particle.EmpParticle;
 import com.example.meteormod.particle.ModParticles;
@@ -32,6 +34,7 @@ public class ClientEventHandler {
         event.registerEntityRenderer(ModEntities.SENTINEL_BULLET.get(), SentinelBulletRenderer::new);
         event.registerEntityRenderer(ModEntities.EMP_BULLET.get(), EmpBulletRenderer::new);
         event.registerEntityRenderer(ModEntities.SENTINEL_HOVER.get(), SentinelHoverRenderer::new);
+        event.registerEntityRenderer(ModEntities.TURRET_BULLET.get(), TurretBulletRenderer::new);
     }
 
     @SubscribeEvent
@@ -49,6 +52,10 @@ public class ClientEventHandler {
         event.registerAboveAll(
                 ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "scope_overlay"),
                 ScopeOverlay::render
+        );
+        event.registerAboveAll(
+                ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "hover_hud"),
+                HoverHudOverlay::render
         );
     }
 
