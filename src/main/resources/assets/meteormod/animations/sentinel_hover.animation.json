@@ -1,0 +1,101 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"thruster": {
+			"loop": true,
+			"animation_length": 0.1667,
+			"bones": {
+				"thruster": {
+					"position": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.0417": {
+							"vector": [0.2, 0, 0]
+						},
+						"0.0833": {
+							"vector": [0, 0.3, 0]
+						},
+						"0.125": {
+							"vector": [-0.2, 0, 0]
+						},
+						"0.1667": {
+							"vector": [0, -0.1, 0]
+						}
+					}
+				}
+			}
+		},
+		"top engines vpered": {
+			"loop": "hold_on_last_frame",
+			"animation_length": 0.25,
+			"bones": {
+				"top_engines": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [40, 0, 0]
+						}
+					}
+				},
+				"depth_engines": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [43, 0, 0]
+						}
+					}
+				}
+			}
+		},
+		"engines nazad": {
+			"loop": "hold_on_last_frame",
+			"animation_length": 0.25,
+			"bones": {
+				"top_engines": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [-45, 0, 0]
+						}
+					}
+				},
+				"depth_engines": {
+					"rotation": {
+						"0.0": {
+							"vector": [0, 0, 0]
+						},
+						"0.25": {
+							"vector": [-41, 0, 0]
+						}
+					}
+				}
+			}
+		},
+		"shoot": {
+			"animation_length": 0.125,
+			"bones": {
+				"turret_left": {
+					"scale": {
+						"0.0": {
+							"vector": [1, 1, 1]
+						},
+						"0.0417": {
+							"vector": [1, 1, 0.9]
+						},
+						"0.0833": {
+							"vector": [1, 1, 1]
+						}
+					}
+				}
+			}
+		}
+	},
+	"geckolib_format_version": 2
+}
