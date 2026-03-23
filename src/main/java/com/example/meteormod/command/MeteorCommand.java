@@ -1,13 +1,22 @@
 package com.example.meteormod.command;
 
 import com.example.meteormod.MeteorConfig;
+import com.example.meteormod.MeteorMod;
 import com.example.meteormod.event.MeteorSpawnHandler;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.phys.Vec3;
 
 public class MeteorCommand {
 
@@ -18,6 +27,11 @@ public class MeteorCommand {
      * Special value -1 → continuous (meteors fall non-stop every tick).
      * Any positive integer → fixed interval in ticks between showers.
      */
+    /** ResourceKey for the outer_space dimension. */
+    public static final ResourceKey<Level> OUTER_SPACE =
+            ResourceKey.create(Registries.DIMENSION,
+                    ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "outer_space"));
+
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("sentinelmod")
@@ -25,6 +39,11 @@ public class MeteorCommand {
                         .then(Commands.literal("setmeteordelay")
                                 .then(Commands.argument("ticks", IntegerArgumentType.integer(-1, MeteorConfig.MAX_DELAY))
                                         .executes(MeteorCommand::executeSetDelay)
+                                )
+                        )
+                        .then(Commands.literal("travel")
+                                .then(Commands.literal("outer_space")
+                                        .executes(MeteorCommand::executeTravelOuterSpace)
                                 )
                         )
         );
@@ -67,6 +86,39 @@ public class MeteorCommand {
                     true
             );
         }
+        return 1;
+    }
+
+    private static int executeTravelOuterSpace(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+
+        ServerPlayer player = src.getPlayer();
+        if (player == null) {
+            src.sendFailure(Component.literal("[MeteorMod] This command must be run by a player."));
+            return 0;
+        }
+
+        ServerLevel targetLevel = src.getServer().getLevel(OUTER_SPACE);
+        if (targetLevel == null) {
+            src.sendFailure(Component.literal(
+                    "[MeteorMod] Outer Space dimension is not loaded. Make sure the mod is installed correctly."));
+            return 0;
+        }
+
+        // Teleport to y=64, centered on block 0,0
+        player.changeDimension(new DimensionTransition(
+                targetLevel,
+                new Vec3(0.5, 64.0, 0.5),
+                Vec3.ZERO,
+                player.getYRot(),
+                player.getXRot(),
+                DimensionTransition.DO_NOTHING
+        ));
+
+        src.sendSuccess(
+                () -> Component.literal("[MeteorMod] Teleported to Outer Space."),
+                true
+        );
         return 1;
     }
 }
