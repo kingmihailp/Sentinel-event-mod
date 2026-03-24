@@ -47,11 +47,15 @@ public class OuterSpacePlayerHandler {
             player.setNoGravity(true);
 
             // ── Freeze ───────────────────────────────────────────────────
+            // NOTE: Post fires after Entity.tick() which already decremented ticksFrozen by 2
+            // (vanilla logic: not in powder snow → -2/tick). We read the post-decrement value,
+            // increment it, and update the local var so the damage check uses the new value.
             int threshold = player.getTicksRequiredToFreeze();
             int frozen    = player.getTicksFrozen();
 
             if (frozen < threshold) {
-                player.setTicksFrozen(Math.min(frozen + FREEZE_RATE, threshold));
+                frozen = Math.min(frozen + FREEZE_RATE, threshold);
+                player.setTicksFrozen(frozen);
             }
 
             // Deal freeze damage once fully frozen
