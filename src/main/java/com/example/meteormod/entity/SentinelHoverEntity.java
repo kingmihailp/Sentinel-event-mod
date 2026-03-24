@@ -182,9 +182,10 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
         this.setDeltaMovement(vel);
         this.move(MoverType.SELF, vel);
 
-        // ── Turbine particles (client-side only) ─────────────────────────
+        // ── Turbine + glow particles (client-side only) ──────────────────
         if (this.level().isClientSide()) {
             spawnTurbineParticles();
+            spawnGlowParticles();
         }
     }
 
@@ -261,6 +262,27 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
         flame(nx, ny, nz, -fwd.x * 0.20, -0.01, -fwd.z * 0.20);
         if (this.random.nextBoolean()) {
             flame(nx, ny, nz, -fwd.x * 0.15, -0.02, -fwd.z * 0.15);
+        }
+    }
+
+    /**
+     * Emits a handful of END_ROD sparks every 3 ticks to create a soft ambient glow
+     * around the hover chassis. Particles drift slowly outward and upward.
+     */
+    private void spawnGlowParticles() {
+        if ((this.tickCount % 3) != 0) return;
+        double cx = this.getX();
+        double cy = this.getY() + 0.5; // mid-height of chassis
+        double cz = this.getZ();
+        for (int i = 0; i < 2; i++) {
+            double angle = this.random.nextDouble() * Math.PI * 2.0;
+            double radius = 0.4 + this.random.nextDouble() * 0.6;
+            double ox = Math.cos(angle) * radius;
+            double oz = Math.sin(angle) * radius;
+            this.level().addParticle(
+                    ParticleTypes.END_ROD,
+                    cx + ox, cy + (this.random.nextFloat() - 0.3f) * 0.6, cz + oz,
+                    ox * 0.015, 0.012 + this.random.nextDouble() * 0.01, oz * 0.015);
         }
     }
 
