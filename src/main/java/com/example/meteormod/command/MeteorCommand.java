@@ -2,7 +2,10 @@ package com.example.meteormod.command;
 
 import com.example.meteormod.MeteorConfig;
 import com.example.meteormod.MeteorMod;
+import com.example.meteormod.entity.ModEntities;
+import com.example.meteormod.entity.SentinelHoverEntity;
 import com.example.meteormod.event.MeteorSpawnHandler;
+import com.example.meteormod.item.ModItems;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -14,6 +17,8 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
@@ -105,20 +110,56 @@ public class MeteorCommand {
             return 0;
         }
 
-        // Teleport to y=64, centered on block 0,0
+        // Check whether player has a hover in inventory or hotbar
+        boolean hasHover = findAndRemoveHover(player);
+        float yaw = player.getYRot();
+
+        // Teleport player to y=65 in the void
+        Vec3 spawnPos = new Vec3(0.5, 65.0, 0.5);
         player.changeDimension(new DimensionTransition(
                 targetLevel,
-                new Vec3(0.5, 64.0, 0.5),
+                spawnPos,
                 Vec3.ZERO,
-                player.getYRot(),
+                yaw,
                 player.getXRot(),
                 DimensionTransition.DO_NOTHING
         ));
 
-        src.sendSuccess(
-                () -> Component.literal("[MeteorMod] Teleported to Outer Space."),
-                true
-        );
+        if (hasHover) {
+            // Spawn hover at the same position and make the player ride it
+            SentinelHoverEntity hover =
+                    new SentinelHoverEntity(ModEntities.SENTINEL_HOVER.get(), targetLevel);
+            hover.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
+            hover.setYRot(yaw);
+            targetLevel.addFreshEntity(hover);
+            player.startRiding(hover, true);
+
+            src.sendSuccess(
+                    () -> Component.literal("[MeteorMod] Launched into Outer Space on your hover."),
+                    true
+            );
+        } else {
+            src.sendSuccess(
+                    () -> Component.literal("[MeteorMod] Ejected into Outer Space — no hover found. Good luck."),
+                    true
+            );
+        }
         return 1;
+    }
+
+    /**
+     * Searches the player's full inventory (hotbar + main) for one
+     * Sentinel Hover item.  Removes it if found and returns {@code true}.
+     */
+    private static boolean findAndRemoveHover(ServerPlayer player) {
+        Inventory inv = player.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack stack = inv.getItem(i);
+            if (!stack.isEmpty() && stack.is(ModItems.SENTINEL_HOVER.get())) {
+                stack.shrink(1);
+                return true;
+            }
+        }
+        return false;
     }
 }

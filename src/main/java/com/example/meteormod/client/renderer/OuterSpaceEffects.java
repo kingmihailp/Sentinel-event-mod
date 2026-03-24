@@ -101,7 +101,13 @@ public class OuterSpaceEffects extends DimensionSpecialEffects {
             double d0 = rng.nextFloat() * 2.0 - 1.0;
             double d1 = rng.nextFloat() * 2.0 - 1.0;
             double d2 = rng.nextFloat() * 2.0 - 1.0;
-            double d3 = 0.15 + rng.nextFloat() * 0.1;       // half-size
+            // Varying star sizes: ~60% tiny, ~30% medium, ~10% large
+            double rand = rng.nextDouble();
+            double d3 = rand < 0.60
+                    ? 0.04 + rng.nextDouble() * 0.06   // tiny:   0.04 – 0.10
+                    : rand < 0.90
+                    ? 0.12 + rng.nextDouble() * 0.10   // medium: 0.12 – 0.22
+                    : 0.25 + rng.nextDouble() * 0.20;  // large:  0.25 – 0.45
             double d4 = d0 * d0 + d1 * d1 + d2 * d2;
 
             if (d4 < 1.0 && d4 > 0.01) {

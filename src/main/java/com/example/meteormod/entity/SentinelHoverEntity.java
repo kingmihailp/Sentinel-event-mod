@@ -2,11 +2,15 @@ package com.example.meteormod.entity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import com.example.meteormod.MeteorMod;
 import com.example.meteormod.item.ModItems;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -32,6 +36,12 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
     private static final float  FRICTION     = 0.80f;  // horizontal drag when no input
     private static final double HOVER_HEIGHT = 1.5;    // target blocks above ground
     private static final float  MAX_VY       = 0.40f;  // vertical speed cap
+
+    /** 6× speed multiplier active only in the Outer Space dimension. */
+    private static final float OUTER_SPACE_SPEED_MULT = 6.0f;
+    private static final ResourceKey<net.minecraft.world.level.Level> OUTER_SPACE =
+            ResourceKey.create(Registries.DIMENSION,
+                    ResourceLocation.fromNamespaceAndPath(MeteorMod.MOD_ID, "outer_space"));
 
     /** Ticks between turret shots (0.5 s). Exposed for HoverHudOverlay cooldown bar. */
     public static final int SHOOT_COOLDOWN_TICKS = 10;
@@ -145,10 +155,14 @@ public class SentinelHoverEntity extends Entity implements GeoEntity {
                 if (shootCooldown > 0) shootCooldown--;
             }
 
+            float effectiveSpeed = this.level().dimension().equals(OUTER_SPACE)
+                    ? SPEED * OUTER_SPACE_SPEED_MULT
+                    : SPEED;
+
             if (forward != 0f || strafe != 0f) {
                 double yaw = Math.toRadians(this.getYRot());
-                double dx  = (-Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * SPEED;
-                double dz  = ( Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * SPEED;
+                double dx  = (-Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * effectiveSpeed;
+                double dz  = ( Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * effectiveSpeed;
                 vel = new Vec3(dx, vel.y, dz);
             } else {
                 vel = new Vec3(vel.x * FRICTION, vel.y, vel.z * FRICTION);
