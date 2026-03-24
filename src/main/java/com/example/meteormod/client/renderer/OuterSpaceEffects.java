@@ -59,6 +59,7 @@ public class OuterSpaceEffects extends DimensionSpecialEffects {
         }
 
         RenderSystem.depthMask(false);
+        RenderSystem.disableCull(); // stars are on an inward-facing sphere; disable back-face culling
         // Vertex colours are baked in; reset shader colour to white so they show as-is
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
@@ -67,6 +68,7 @@ public class OuterSpaceEffects extends DimensionSpecialEffects {
                 GameRenderer.getPositionColorShader());
         VertexBuffer.unbind();
 
+        RenderSystem.enableCull();
         RenderSystem.depthMask(true);
 
         return true; // skip vanilla rendering
